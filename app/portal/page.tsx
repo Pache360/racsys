@@ -4,12 +4,17 @@ import { supabase } from '@/lib/supabase';
 import { 
   CalendarIcon, 
   ArrowRightOnRectangleIcon,
-  RectangleGroupIcon
+  RectangleGroupIcon,
+  Squares2X2Icon, // Icono para vista cuadrícula
+  ListBulletIcon  // Icono para lista
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
 export default function PortalCliente() {
   const [eventos, setEventos] = useState<any[]>([]);
+  const [misMarcas, setMisMarcas] = useState<string[]>([]);
+  const [filtroMarca, setFiltroMarca] = useState('Todas');
+  const [vista, setVista] = useState<'Cuadrícula' | 'Calendario'>('Cuadrícula');
   const [duenoNombre, setDuenoNombre] = useState('');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
@@ -17,8 +22,6 @@ export default function PortalCliente() {
   useEffect(() => {
     const cookies = document.cookie.split('; ');
     const clienteIdCookie = cookies.find(row => row.startsWith('pache_cliente_id='));
-    
-    // Obtenemos el nombre del login (ANTONIO MATADAMAZ)
     const idSesion = clienteIdCookie ? decodeURIComponent(clienteIdCookie.split('=')[1]) : null;
 
     if (!idSesion) {
@@ -30,26 +33,21 @@ export default function PortalCliente() {
 
     const fetchContenidoVIP = async () => {
       setLoading(true);
-      
       try {
-        // 1. Buscamos al cliente en la DB para obtener su dueno_id o sus marcas
         const { data: clienteDB } = await supabase
           .from('clientes')
           .select('*')
           .eq('nombre', idSesion)
           .single();
 
-        // 2. Buscamos todas las marcas relacionadas (por nombre o por dueno_id)
         const { data: marcasAsociadas } = await supabase
           .from('clientes')
           .select('nombre')
           .or(`dueno_id.eq."${idSesion}",dueno_id.eq."${clienteDB?.acceso_pass || 'N/A'}",nombre.eq."${idSesion}"`);
 
         const listaNombres = marcasAsociadas ? marcasAsociadas.map(m => m.nombre) : [idSesion];
-        if (!listaNombres.includes(idSesion)) listaNombres.push(idSesion);
+        setMisMarcas(listaNombres);
 
-        // 3. BUSQUEDA SUPER FLEXIBLE DE PROYECTOS
-        // Traemos todos los proyectos y filtramos en el cliente para evitar errores de coincidencia exacta
         const { data: todosLosProyectos } = await supabase
           .from('proyectos')
           .select('*');
@@ -57,7 +55,6 @@ export default function PortalCliente() {
         if (todosLosProyectos) {
           const filtrados = todosLosProyectos.filter(proy => {
             const pCliente = proy.cliente?.toLowerCase() || "";
-            // Si el nombre del proyecto contiene el nombre del dueño o viceversa
             return listaNombres.some(n => 
               pCliente.includes(n.toLowerCase()) || n.toLowerCase().includes(pCliente)
             );
@@ -80,6 +77,11 @@ export default function PortalCliente() {
     router.push('/login');
   };
 
+  // Filtrado final basado en el selector de marca
+  const eventosAMostrar = filtroMarca === 'Todas' 
+    ? eventos 
+    : eventos.filter(e => e.cliente === filtroMarca);
+
   if (loading) return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
       <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-purple-500"></div>
@@ -88,20 +90,62 @@ export default function PortalCliente() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
-      <header className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
+      {/* HEADER */}
+      <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/5 pb-6 gap-6">
         <div>
           <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white">PORTAL <span className="text-purple-500">PACHE360</span></h1>
-          <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">BIENVENIDO, {duenoNombre}</p>
+          <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1 italic">Bienvenido, {duenoNombre}</p>
         </div>
-        <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-3 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95">
-          <ArrowRightOnRectangleIcon className="h-5 w-5" />
-        </button>
+        
+        <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* SELECTOR DE VISTA */}
+          <div className="flex bg-[#111] p-1 rounded-xl border border-gray-800">
+            <button 
+              onClick={() => setVista('Cuadrícula')}
+              className={`p-2 rounded-lg transition-all ${vista === 'Cuadrícula' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}
+            >
+              <Squares2X2Icon className="h-5 w-5" />
+            </button>
+            <button 
+              onClick={() => setVista('Calendario')}
+              className={`p-2 rounded-lg transition-all ${vista === 'Calendario' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}
+            >
+              <CalendarIcon className="h-5 w-5" />
+            </button>
+          </div>
+
+          <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95 ml-auto">
+            <ArrowRightOnRectangleIcon className="h-5 w-5" />
+          </button>
+        </div>
       </header>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {eventos.length > 0 ? (
-          eventos.map((item) => (
-            <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300">
+      {/* FILTROS DE MARCA */}
+      {misMarcas.length > 1 && (
+        <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 snap-x">
+          <button 
+            onClick={() => setFiltroMarca('Todas')}
+            className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border ${filtroMarca === 'Todas' ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-800'}`}
+          >
+            Todas
+          </button>
+          {misMarcas.map(m => (
+            <button 
+              key={m}
+              onClick={() => setFiltroMarca(m)}
+              className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border whitespace-nowrap ${filtroMarca === m ? 'bg-purple-600 text-white border-purple-500' : 'bg-transparent text-gray-500 border-gray-800'}`}
+            >
+              {m}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* VISTA CONTENIDO */}
+      {vista === 'Cuadrícula' ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {eventosAMostrar.length > 0 ? eventosAMostrar.map((item) => (
+            <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all">
               <div className="flex justify-between items-start mb-4">
                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                   item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
@@ -111,33 +155,53 @@ export default function PortalCliente() {
                   {item.categoria}
                 </span>
                 <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]">
-                  <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PRÓXIMAMENTE"}
+                  <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PROX."}
                 </div>
               </div>
-
               <h3 className="text-xl font-bold uppercase italic mb-1 text-white">{item.titulo}</h3>
               <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1">
                 <RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}
               </p>
-
-              <div className="space-y-4">
-                 <p className="text-gray-400 text-xs italic leading-relaxed line-clamp-2">{item.descripcion || "Producción en curso..."}</p>
-                 <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
-                    <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
-                    <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' ? 'text-green-400' : 'text-purple-400'}`}>
-                      {item.estado}
-                    </span>
-                 </div>
+              <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
+                <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
+                <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' ? 'text-green-400' : 'text-purple-400'}`}>
+                  {item.estado}
+                </span>
               </div>
             </div>
-          ))
-        ) : (
-          <div className="col-span-full text-center py-24 bg-[#111]/30 rounded-[3rem] border border-dashed border-gray-800">
-            <p className="text-gray-600 italic uppercase font-black text-sm tracking-widest">No hay contenido programado para tus marcas</p>
-            <p className="text-gray-700 text-[10px] mt-4 font-bold uppercase">Asegúrate de que tus proyectos en el Dashboard coincidan con tu nombre de marca.</p>
+          )) : <NoContent />}
+        </div>
+      ) : (
+        /* VISTA CALENDARIO SIMPLIFICADA */
+        <div className="bg-[#111] border border-gray-800 rounded-[2.5rem] p-6 md:p-10 shadow-2xl">
+          <div className="space-y-6">
+            {eventosAMostrar.sort((a,b) => new Date(a.fecha_entrega).getTime() - new Date(b.fecha_entrega).getTime()).map(item => (
+              <div key={item.id} className="flex gap-4 items-center border-b border-gray-800/50 pb-6 last:border-0">
+                <div className="text-center min-w-15">
+                  <span className="block text-[10px] font-black text-purple-500 uppercase">{new Date(item.fecha_entrega).toLocaleString('es-MX', {month: 'short'})}</span>
+                  <span className="block text-2xl font-black text-white">{new Date(item.fecha_entrega).getDate() + 1}</span>
+                </div>
+                <div className="flex-1">
+                  <h4 className="text-sm font-black uppercase italic text-white leading-none">{item.titulo}</h4>
+                  <span className="text-[10px] text-gray-500 uppercase font-bold">{item.cliente} • {item.categoria}</span>
+                </div>
+                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${item.estado === 'Entregado' ? 'border-green-500 text-green-400' : 'border-purple-500 text-purple-400'}`}>
+                  {item.estado}
+                </div>
+              </div>
+            ))}
+            {eventosAMostrar.length === 0 && <NoContent />}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </main>
+  );
+}
+
+function NoContent() {
+  return (
+    <div className="col-span-full text-center py-24 bg-[#111]/30 rounded-[3rem] border border-dashed border-gray-800">
+      <p className="text-gray-600 italic uppercase font-black text-sm tracking-widest">No hay contenido programado</p>
+    </div>
   );
 }
