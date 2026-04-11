@@ -177,7 +177,7 @@ export default function ClientesPage() {
                 </div>
                 <div className="pr-12 sm:pr-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg md:text-xl uppercase italic leading-none truncate max-w-[150px]">{c.nombre}</h3>
+                    <h3 className="font-bold text-lg md:text-xl uppercase italic leading-none truncate max-w-37.5">{c.nombre}</h3>
                   </div>
                   <div className="flex items-center gap-2 text-gray-500 mt-2">
                     <PhoneIcon className="h-3 w-3 text-cyan-500" />
@@ -222,7 +222,7 @@ export default function ClientesPage() {
       {/* MODAL DE EDICIÓN / AGREGAR (Mantenido igual para no romper lógica) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
+          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-4xl sm:rounded-4xl shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
             <div className="p-6 md:p-8 flex flex-col gap-4 bg-[#161616]">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl md:text-2xl font-black text-cyan-400 uppercase italic tracking-tighter">

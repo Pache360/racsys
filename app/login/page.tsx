@@ -13,31 +13,32 @@ export default function LoginPage() {
     e.preventDefault();
     setLoading(true);
 
-    // 1. VALIDACIÓN PARA TI (ADMIN)
-    if (user === 'admin' && pass === 'Locosa140295') {
+    // 1. VALIDACIÓN ADMIN
+    if (user.toLowerCase() === 'admin' && pass === 'Locosa140295') {
       document.cookie = "pache_auth=admin; path=/; max-age=86400; SameSite=Strict";
       router.push('/');
       return;
     }
 
-    // 2. VALIDACIÓN PARA CLIENTES (NUEVA)
-    // Buscamos en la tabla clientes si el 'user' coincide con el nombre y 'pass' con acceso_pass
+    // 2. VALIDACIÓN CLIENTE ESTRICTA
+    // Buscamos que el nombre coincida Y la contraseña también
     const { data: cliente, error } = await supabase
       .from('clientes')
       .select('nombre, acceso_pass, dueno_id')
+      .eq('nombre', user) // El usuario DEBE escribir su nombre/marca
       .eq('acceso_pass', pass)
-      .limit(1)
       .single();
 
     if (cliente) {
-      // Guardamos en la cookie el nombre del dueño o de la marca para filtrar después
-      const identifier = cliente.dueno_id || cliente.nombre;
-      document.cookie = `pache_auth=cliente; path=/; max-age=86400; SameSite=Strict`;
-      document.cookie = `pache_cliente_id=${identifier}; path=/; max-age=86400; SameSite=Strict`;
+      // Si es una marca, usamos su propio nombre. Si es un dueño, usamos su nombre.
+      const idParaCookie = cliente.nombre;
       
-      router.push('/portal'); // Ruta nueva para clientes
+      document.cookie = "pache_auth=cliente; path=/; max-age=86400; SameSite=Strict";
+      document.cookie = `pache_cliente_id=${encodeURIComponent(idParaCookie)}; path=/; max-age=86400; SameSite=Strict`;
+      
+      router.push('/portal');
     } else {
-      alert('Acceso Denegado: Credenciales incorrectas');
+      alert('Error: Usuario o Contraseña incorrectos. Verifica que escribiste tu nombre tal cual aparece en el sistema.');
     }
     setLoading(false);
   };
@@ -47,23 +48,25 @@ export default function LoginPage() {
       <form onSubmit={handleLogin} className="bg-[#111] border border-purple-500/30 p-8 rounded-[2.5rem] w-full max-w-sm shadow-2xl">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-black italic text-white uppercase tracking-tighter">PACHE<span className="text-purple-500">360</span></h1>
-          <p className="text-gray-500 text-[10px] font-bold uppercase tracking-widest mt-2">Acceso al Sistema</p>
+          <p className="text-gray-500 text-[10px] font-black uppercase tracking-widest mt-2">Portal de Clientes</p>
         </div>
         
         <div className="space-y-4">
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-gray-600 uppercase ml-2 tracking-widest">Usuario / Marca</label>
+            <label className="text-[9px] font-black text-gray-600 uppercase ml-2 tracking-widest">Nombre de Usuario / Marca</label>
             <input 
+              required
               type="text" 
-              placeholder="Ej: admin o nombre de marca" 
+              placeholder="Escribe tu nombre o marca" 
               value={user}
               onChange={(e) => setUser(e.target.value)}
               className="w-full bg-black border border-gray-800 rounded-2xl p-4 outline-none focus:border-purple-500 text-white font-bold"
             />
           </div>
           <div className="space-y-1">
-            <label className="text-[9px] font-black text-gray-600 uppercase ml-2 tracking-widest">Código de Acceso</label>
+            <label className="text-[9px] font-black text-gray-600 uppercase ml-2 tracking-widest">Contraseña de Acceso</label>
             <input 
+              required
               type="password" 
               placeholder="••••••••" 
               value={pass}
@@ -75,7 +78,7 @@ export default function LoginPage() {
             disabled={loading}
             className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest shadow-lg shadow-purple-500/20 disabled:opacity-50"
           >
-            {loading ? 'Verificando...' : 'Entrar'}
+            {loading ? 'Iniciando Sesión...' : 'Entrar al Portal'}
           </button>
         </div>
       </form>
