@@ -45,8 +45,12 @@ export default function PortalCliente() {
           .select('nombre')
           .or(`dueno_id.eq."${idSesion}",dueno_id.eq."${clienteDB?.acceso_pass || 'N/A'}",nombre.eq."${idSesion}"`);
 
+        // --- CAMBIO APLICADO: Filtramos el nombre del dueño para que no aparezca en los botones ---
         const listaNombres = marcasAsociadas ? marcasAsociadas.map(m => m.nombre) : [idSesion];
-        setMisMarcas(listaNombres);
+        
+        // Aquí filtramos para que 'misMarcas' (los botones) solo contenga lo que NO sea el nombre del dueño
+        const soloMarcas = listaNombres.filter(n => n.toLowerCase() !== idSesion.toLowerCase());
+        setMisMarcas(soloMarcas);
 
         const { data: todosLosProyectos } = await supabase
           .from('proyectos')
@@ -55,6 +59,7 @@ export default function PortalCliente() {
         if (todosLosProyectos) {
           const filtrados = todosLosProyectos.filter(proy => {
             const pCliente = proy.cliente?.toLowerCase() || "";
+            // La búsqueda de proyectos sigue usando 'listaNombres' completa para no perder info
             return listaNombres.some(n => 
               pCliente.includes(n.toLowerCase()) || n.toLowerCase().includes(pCliente)
             );
@@ -120,7 +125,7 @@ export default function PortalCliente() {
         </div>
       </header>
 
-      {/* FILTROS DE MARCA */}
+      {/* FILTROS DE MARCA: Ahora solo mostrará marcas reales */}
       {misMarcas.length > 1 && (
         <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 snap-x">
           <button 
