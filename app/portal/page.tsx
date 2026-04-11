@@ -3,9 +3,6 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   CalendarIcon, 
-  PhotoIcon, 
-  VideoCameraIcon, 
-  ChatBubbleBottomCenterTextIcon, 
   ArrowRightOnRectangleIcon,
   RectangleGroupIcon
 } from '@heroicons/react/24/outline';
@@ -13,17 +10,15 @@ import { useRouter } from 'next/navigation';
 
 export default function PortalCliente() {
   const [eventos, setEventos] = useState<any[]>([]);
-  const [misMarcas, setMisMarcas] = useState<string[]>([]);
-  const [filtroMarca, setFiltroMarca] = useState('Todas');
   const [duenoNombre, setDuenoNombre] = useState('');
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
   useEffect(() => {
     const cookies = document.cookie.split('; ');
-    const authCookie = cookies.find(row => row.startsWith('pache_auth='));
     const clienteIdCookie = cookies.find(row => row.startsWith('pache_cliente_id='));
     
+    // Este es el nombre o ID del Dueño que inició sesión (ej: ANTONIO MATADAMAZ)
     const clienteId = clienteIdCookie ? decodeURIComponent(clienteIdCookie.split('=')[1]) : null;
 
     if (!clienteId) {
@@ -36,26 +31,26 @@ export default function PortalCliente() {
     const fetchContenidoVIP = async () => {
       setLoading(true);
       
-      // 1. Buscamos todas las marcas que pertenecen a este dueño (usando su ID/Pass)
+      // 1. Buscamos todas las MARCAS que pertenecen a este DUEÑO
+      // Usamos el campo dueno_id que configuramos en la tabla clientes
       const { data: marcasAsociadas } = await supabase
         .from('clientes')
         .select('nombre')
         .eq('dueno_id', clienteId);
 
-      // Creamos un array con los nombres de sus marcas
-      // Incluimos también el nombre del dueño por si hay proyectos a su nombre
-      const nombresParaFiltrar = marcasAsociadas 
+      // Creamos una lista de nombres para buscar proyectos
+      // Incluimos los nombres de sus marcas y también el nombre del dueño por si acaso
+      const listaDeNombres = marcasAsociadas 
         ? marcasAsociadas.map(m => m.nombre) 
         : [];
       
-      nombresParaFiltrar.push(clienteId);
-      setMisMarcas(nombresParaFiltrar.filter(n => n !== clienteId)); // Solo marcas para los botones
+      listaDeNombres.push(clienteId);
 
-      // 2. Traemos todos los proyectos (Fotos, Videos, Posts) de esas marcas
+      // 2. Traemos todos los proyectos donde el 'cliente' sea cualquiera de esas marcas
       const { data: proyectos } = await supabase
         .from('proyectos')
         .select('*')
-        .in('cliente', nombresParaFiltrar)
+        .in('cliente', listaDeNombres) // Aquí está el truco: busca en toda la lista
         .order('fecha_entrega', { ascending: true });
       
       if (proyectos) setEventos(proyectos);
@@ -70,10 +65,6 @@ export default function PortalCliente() {
     document.cookie = "pache_cliente_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC;";
     router.push('/login');
   };
-
-  const eventosFiltrados = filtroMarca === 'Todas' 
-    ? eventos 
-    : eventos.filter(e => e.cliente === filtroMarca);
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -93,29 +84,8 @@ export default function PortalCliente() {
         </button>
       </header>
 
-      {/* FILTRO DE MARCAS (Solo si tiene más de una) */}
-      {misMarcas.length > 1 && (
-        <div className="flex gap-2 overflow-x-auto pb-6 mb-4 snap-x">
-          <button 
-            onClick={() => setFiltroMarca('Todas')}
-            className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all snap-start shrink-0 border ${filtroMarca === 'Todas' ? 'bg-white text-black border-white' : 'bg-[#111] text-gray-500 border-gray-800'}`}
-          >
-            Ver Todo
-          </button>
-          {misMarcas.map(marca => (
-            <button 
-              key={marca}
-              onClick={() => setFiltroMarca(marca)}
-              className={`px-5 py-2.5 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all snap-start shrink-0 border ${filtroMarca === marca ? 'bg-purple-600 text-white border-purple-500 shadow-lg shadow-purple-600/20' : 'bg-[#111] text-gray-500 border-gray-800'}`}
-            >
-              {marca}
-            </button>
-          ))}
-        </div>
-      )}
-
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {eventosFiltrados.length > 0 ? eventosFiltrados.map((item) => (
+        {eventos.length > 0 ? eventos.map((item) => (
           <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all">
             <div className="flex justify-between items-start mb-4">
               <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
@@ -126,7 +96,7 @@ export default function PortalCliente() {
                 {item.categoria}
               </span>
               <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]">
-                <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PROXIMAMENTE"}
+                <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PRÓXIMAMENTE"}
               </div>
             </div>
 
