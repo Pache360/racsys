@@ -1,16 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation'; // Importamos useRouter para redirigir
+import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { 
   CameraIcon, VideoCameraIcon, PlusIcon, PlayIcon, 
   ChatBubbleLeftRightIcon, CalendarIcon, XMarkIcon,
-  UserGroupIcon, ArrowRightOnRectangleIcon // Importamos icono de salida
+  UserGroupIcon, ArrowRightOnRectangleIcon 
 } from '@heroicons/react/24/outline';
 
 export default function Home() {
-  const router = useRouter(); // Inicializamos el router
+  const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [categoria, setCategoria] = useState('Fotografía');
   const [loading, setLoading] = useState(false);
@@ -34,15 +34,12 @@ export default function Home() {
     nuevoClienteLogo: ''
   });
 
-  // FUNCIÓN PARA CERRAR SESIÓN (NUEVA)
   const handleLogout = () => {
-    // Borramos la cookie de autenticación expirándola inmediatamente
     document.cookie = "pache_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict";
-    router.push('/login'); // Mandamos al usuario al login
+    router.push('/login');
   };
 
   const fetchDatos = async () => {
-    // Traemos proyectos y clientes (dueños y marcas)
     const { data: proyData } = await supabase
       .from('proyectos')
       .select('*')
@@ -50,16 +47,16 @@ export default function Home() {
 
     const { data: clientData } = await supabase
       .from('clientes')
-      .select('*') // Traemos todo para filtrar marcas de dueños
+      .select('*')
       .order('nombre', { ascending: true });
 
     if (proyData && clientData) {
-      // Identificamos quiénes son marcas (los que tienen dueno_id)
+      // Identificamos las marcas (los que tienen dueno_id)
       const nombresMarcas = clientData
         .filter(c => c.dueno_id && c.dueno_id !== '')
         .map(c => c.nombre);
 
-      // Filtramos proyectos para que en el Dashboard solo cuenten y se vean los de MARCAS
+      // Filtramos proyectos para el Dashboard (solo marcas)
       const proyectosSoloMarcas = proyData.filter(p => nombresMarcas.includes(p.cliente));
 
       const formateados = proyectosSoloMarcas.map(p => ({
@@ -78,10 +75,11 @@ export default function Home() {
         youtube: 0, 
         posts: proyectosSoloMarcas.filter(p => p.categoria === 'Posts').length,
       });
-    }
 
-    if (clientData) {
-      setListaClientesDB(clientData);
+      // --- CAMBIO AQUÍ ---
+      // Filtramos la lista para el SELECTOR del modal: Solo mostramos registros que son MARCAS
+      const soloMarcasParaSelector = clientData.filter(c => c.dueno_id && c.dueno_id !== '');
+      setListaClientesDB(soloMarcasParaSelector);
     }
   };
 
@@ -150,8 +148,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8 relative">
-      
-      {/* HEADER RESPONSIVO: Se apila en móvil, se expande en PC */}
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 md:mb-12 border-b border-purple-900/30 pb-6 gap-6 md:gap-0">
         <div className="text-center md:text-left">
           <h1 className="text-4xl font-extrabold tracking-tight italic">PACHE<span className="text-purple-500">360</span></h1>
@@ -159,7 +155,6 @@ export default function Home() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-          {/* BOTÓN CERRAR SESIÓN (NUEVO) */}
           <button 
             onClick={handleLogout}
             className="flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-500/30 px-4 py-3 rounded-xl font-bold transition-all active:scale-95 text-xs uppercase w-full sm:w-auto"
@@ -183,7 +178,6 @@ export default function Home() {
         </div>
       </header>
 
-      {/* SECCIONES PRINCIPALES: Solo cuentan proyectos de MARCAS */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
         <Link href="/fotos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <CameraIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
@@ -207,7 +201,6 @@ export default function Home() {
         </Link>
       </section>
       
-      {/* PRÓXIMAS ENTREGAS: Solo visualiza MARCAS */}
       <div className="bg-[#111] border border-gray-800 rounded-3xl p-4 md:p-8 shadow-2xl">
         <div className="flex items-center gap-2 mb-6 italic">
           <CalendarIcon className="h-6 w-6 text-purple-500" />
@@ -234,7 +227,6 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL NUEVO PROYECTO: Aquí sí aparecen Marcas y Dueños */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
@@ -256,14 +248,14 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Asignar a Marca/Dueño</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Asignar a Marca</label>
                 <select 
                   value={formData.cliente}
                   onChange={(e) => setFormData({...formData, cliente: e.target.value})}
                   className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm"
                   disabled={formData.prioridad === 'Cliente Nuevo'}
                 >
-                  <option value="">Seleccionar...</option>
+                  <option value="">Seleccionar Marca...</option>
                   {listaClientesDB.map((c, i) => <option key={i} value={c.nombre}>{c.nombre}</option>)}
                 </select>
               </div>
