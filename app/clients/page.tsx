@@ -5,7 +5,8 @@ import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeftIcon, UserGroupIcon, PencilIcon, 
   TrashIcon, PhoneIcon, PlusIcon, XMarkIcon,
-  BanknotesIcon, TagIcon, Cog6ToothIcon
+  BanknotesIcon, TagIcon, Cog6ToothIcon,
+  BriefcaseIcon, RectangleGroupIcon // Nuevos iconos
 } from '@heroicons/react/24/outline';
 
 export default function ClientesPage() {
@@ -13,11 +14,11 @@ export default function ClientesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
-
-  // NUEVO: Modo gestión para habilitar edición/eliminación
   const [modoGestion, setModoGestion] = useState(false);
 
-  // NUEVO: Estado para diferenciar si creamos Dueño o Marca
+  // --- NUEVA LÓGICA DE FILTRADO POR VISTA ---
+  const [vistaFiltro, setVistaFiltro] = useState<'Dueños' | 'Marcas'>('Dueños');
+
   const [tipoRegistro, setTipoRegistro] = useState<'Dueño' | 'Marca'>('Dueño');
 
   const [clientForm, setClientForm] = useState({
@@ -26,8 +27,8 @@ export default function ClientesPage() {
     presupuesto_total: 0,
     monto_pagado: 0,
     logo_url: '',
-    acceso_pass: '', // Para el login del cliente
-    dueno_id: ''     // Para vincular marcas a un dueño
+    acceso_pass: '',
+    dueno_id: ''
   });
 
   const fetchClientes = async () => {
@@ -37,9 +38,17 @@ export default function ClientesPage() {
 
   useEffect(() => { fetchClientes(); }, []);
 
+  // Filtrado de la lista según la vista seleccionada
+  const clientesFiltrados = clientes.filter(c => {
+    const esDueno = !c.dueno_id || c.dueno_id === '';
+    return vistaFiltro === 'Dueños' ? esDueno : !esDueno;
+  });
+
   const handleOpenModal = (cliente?: any) => {
     if (cliente) {
       setEditId(cliente.id);
+      const esDueno = !cliente.dueno_id || cliente.dueno_id === '';
+      setTipoRegistro(esDueno ? 'Dueño' : 'Marca');
       setClientForm({
         nombre: cliente.nombre,
         contacto: cliente.contacto || '',
@@ -59,7 +68,6 @@ export default function ClientesPage() {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSaving(true);
-
     const payload = { 
       nombre: clientForm.nombre,
       marca: clientForm.nombre,
@@ -68,13 +76,11 @@ export default function ClientesPage() {
       monto_pagado: clientForm.monto_pagado,
       logo_url: clientForm.logo_url,
       acceso_pass: clientForm.acceso_pass,
-      dueno_id: clientForm.dueno_id
+      dueno_id: tipoRegistro === 'Dueño' ? '' : clientForm.dueno_id
     };
-
     const { error } = editId 
       ? await supabase.from('clientes').update(payload).eq('id', editId)
       : await supabase.from('clientes').insert([payload]);
-
     if (!error) {
       setIsModalOpen(false);
       fetchClientes();
@@ -85,7 +91,7 @@ export default function ClientesPage() {
   };
 
   const deleteCliente = async (id: string) => {
-    if (confirm('¿Deseas eliminar este registro de forma permanente?')) {
+    if (confirm('¿Deseas eliminar este registro?')) {
       await supabase.from('clientes').delete().eq('id', id);
       fetchClientes();
     }
@@ -101,17 +107,16 @@ export default function ClientesPage() {
         </Link>
       </div>
 
-      {/* HEADER RESPONSIVO CON BOTÓN DE GESTIÓN */}
-      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-6">
+      {/* HEADER */}
+      <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-6">
         <div className="flex items-center gap-4">
           <div className="bg-cyan-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-cyan-600/20 italic">
             <UserGroupIcon className="h-6 w-6 md:h-8 md:w-8 text-white" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold italic uppercase tracking-tighter">Clientes y Marcas</h1>
+          <h1 className="text-2xl md:text-3xl font-bold italic uppercase tracking-tighter">Gestión de Directorio</h1>
         </div>
-
+        
         <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-          {/* BOTÓN GESTIONAR LISTA (NUEVO) */}
           <button 
             onClick={() => setModoGestion(!modoGestion)}
             className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all text-xs md:text-sm italic shadow-lg ${modoGestion ? 'bg-orange-600 text-white shadow-orange-600/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}
@@ -129,19 +134,34 @@ export default function ClientesPage() {
         </div>
       </header>
 
-      {/* GRID DE CLIENTES / MARCAS */}
+      {/* --- NAVEGADOR DE VISTAS (DUEÑOS VS MARCAS) --- */}
+      <div className="flex bg-[#111] p-1.5 rounded-2xl w-full max-w-md mb-10 border border-gray-800/50 mx-auto sm:mx-0">
+        <button 
+          onClick={() => setVistaFiltro('Dueños')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${vistaFiltro === 'Dueños' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <BriefcaseIcon className="h-4 w-4" /> Dueños / Clientes
+        </button>
+        <button 
+          onClick={() => setVistaFiltro('Marcas')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${vistaFiltro === 'Marcas' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <RectangleGroupIcon className="h-4 w-4" /> Marcas Registradas
+        </button>
+      </div>
+
+      {/* GRID FILTRADO */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-        {clientes.map((c) => {
+        {clientesFiltrados.map((c) => {
           const restan = c.presupuesto_total - c.monto_pagado;
           const porcPago = c.presupuesto_total > 0 ? (c.monto_pagado / c.presupuesto_total) * 100 : 0;
           const esDueno = !c.dueno_id || c.dueno_id === '';
           
           return (
-            <div key={c.id} className={`bg-[#111] border ${esDueno ? 'border-purple-500/20' : 'border-gray-800'} ${modoGestion ? 'border-orange-500/50' : ''} rounded-3xl p-5 md:p-6 hover:border-cyan-500/40 transition-all group relative shadow-2xl`}>
+            <div key={c.id} className={`bg-[#111] border ${esDueno ? 'border-purple-500/20' : 'border-gray-800'} ${modoGestion ? 'border-orange-500/50 ring-1 ring-orange-500/20' : ''} rounded-3xl p-5 md:p-6 hover:border-cyan-500/40 transition-all group relative shadow-2xl animate-in fade-in zoom-in duration-300`}>
               
-              {/* ACCIONES: Solo visibles o resaltadas en modo gestión */}
               {modoGestion && (
-                <div className="absolute top-4 right-4 flex gap-2 animate-in fade-in zoom-in duration-200">
+                <div className="absolute top-4 right-4 flex gap-2 z-10">
                   <button onClick={() => handleOpenModal(c)} className="p-2 bg-gray-900 rounded-xl hover:text-cyan-400 border border-gray-800 transition-colors shadow-xl">
                     <PencilIcon className="h-4 w-4" />
                   </button>
@@ -157,10 +177,7 @@ export default function ClientesPage() {
                 </div>
                 <div className="pr-12 sm:pr-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg md:text-xl uppercase italic leading-none truncate max-w-30">{c.nombre}</h3>
-                    <span className={`text-[7px] px-1.5 py-0.5 rounded-md border font-black ${esDueno ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-gray-600 text-gray-500'}`}>
-                      {esDueno ? 'DUEÑO' : 'MARCA'}
-                    </span>
+                    <h3 className="font-bold text-lg md:text-xl uppercase italic leading-none truncate max-w-[150px]">{c.nombre}</h3>
                   </div>
                   <div className="flex items-center gap-2 text-gray-500 mt-2">
                     <PhoneIcon className="h-3 w-3 text-cyan-500" />
@@ -195,11 +212,17 @@ export default function ClientesPage() {
           );
         })}
       </div>
+      
+      {clientesFiltrados.length === 0 && (
+        <div className="text-center py-20 text-gray-600 italic uppercase font-black tracking-widest opacity-50">
+          No hay {vistaFiltro.toLowerCase()} registrados en la lista.
+        </div>
+      )}
 
-      {/* MODAL DE EDICIÓN / AGREGAR */}
+      {/* MODAL DE EDICIÓN / AGREGAR (Mantenido igual para no romper lógica) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-4xl sm:rounded-4xl shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
+          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
             <div className="p-6 md:p-8 flex flex-col gap-4 bg-[#161616]">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl md:text-2xl font-black text-cyan-400 uppercase italic tracking-tighter">
@@ -214,6 +237,7 @@ export default function ClientesPage() {
                 {['Dueño', 'Marca'].map((tipo) => (
                   <button
                     key={tipo}
+                    type="button"
                     onClick={() => setTipoRegistro(tipo as any)}
                     className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${tipoRegistro === tipo ? 'bg-cyan-600 text-white' : 'text-gray-500'}`}
                   >
@@ -236,15 +260,15 @@ export default function ClientesPage() {
                 </div>
               ) : (
                 <div className="space-y-1 animate-in fade-in slide-in-from-top-2">
-                  <label className="text-[9px] md:text-[10px] font-black text-orange-500 uppercase ml-2 tracking-widest">ID del Dueño (Para vincular)</label>
+                  <label className="text-[9px] md:text-[10px] font-black text-orange-500 uppercase ml-2 tracking-widest">Dueño de la Marca</label>
                   <select 
                     value={clientForm.dueno_id} 
                     onChange={e => setClientForm({...clientForm, dueno_id: e.target.value})}
                     className="w-full bg-[#0d0d0d] border border-orange-900/30 rounded-2xl p-4 outline-none focus:border-orange-500 text-sm text-white"
                   >
                     <option value="">Selecciona al Dueño...</option>
-                    {clientes.filter(c => !c.dueno_id).map(d => (
-                      <option key={d.id} value={d.acceso_pass}>{d.nombre} (Pass: {d.acceso_pass})</option>
+                    {clientes.filter(c => !c.dueno_id || c.dueno_id === '').map(d => (
+                      <option key={d.id} value={d.acceso_pass}>{d.nombre}</option>
                     ))}
                   </select>
                 </div>
@@ -257,11 +281,11 @@ export default function ClientesPage() {
 
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-1">
-                  <label className="text-[9px] md:text-[10px] font-black text-cyan-500 uppercase ml-2 tracking-widest">Precio</label>
+                  <label className="text-[9px] md:text-[10px] font-black text-cyan-500 uppercase ml-2 tracking-widest">Precio Total</label>
                   <input type="number" value={clientForm.presupuesto_total} onChange={e => setClientForm({...clientForm, presupuesto_total: Number(e.target.value)})} className="w-full bg-[#0d0d0d] border border-cyan-900/30 rounded-2xl p-4 outline-none focus:border-cyan-500 text-sm font-mono text-cyan-400" />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[9px] md:text-[10px] font-black text-green-500 uppercase ml-2 tracking-widest">Abono</label>
+                  <label className="text-[9px] md:text-[10px] font-black text-green-500 uppercase ml-2 tracking-widest">Monto Pagado</label>
                   <input type="number" value={clientForm.monto_pagado} onChange={e => setClientForm({...clientForm, monto_pagado: Number(e.target.value)})} className="w-full bg-[#0d0d0d] border border-green-900/30 rounded-2xl p-4 outline-none focus:border-green-500 text-sm font-mono text-green-400" />
                 </div>
               </div>
