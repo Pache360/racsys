@@ -42,6 +42,7 @@ export default function Home() {
   };
 
   const fetchDatos = async () => {
+    // Traemos proyectos y clientes (dueños y marcas)
     const { data: proyData } = await supabase
       .from('proyectos')
       .select('*')
@@ -49,11 +50,19 @@ export default function Home() {
 
     const { data: clientData } = await supabase
       .from('clientes')
-      .select('nombre')
+      .select('*') // Traemos todo para filtrar marcas de dueños
       .order('nombre', { ascending: true });
 
-    if (proyData) {
-      const formateados = proyData.map(p => ({
+    if (proyData && clientData) {
+      // Identificamos quiénes son marcas (los que tienen dueno_id)
+      const nombresMarcas = clientData
+        .filter(c => c.dueno_id && c.dueno_id !== '')
+        .map(c => c.nombre);
+
+      // Filtramos proyectos para que en el Dashboard solo cuenten y se vean los de MARCAS
+      const proyectosSoloMarcas = proyData.filter(p => nombresMarcas.includes(p.cliente));
+
+      const formateados = proyectosSoloMarcas.map(p => ({
         id: p.id,
         nombre: p.titulo,
         cliente: p.cliente,
@@ -64,10 +73,10 @@ export default function Home() {
       setProyectosDB(formateados);
 
       setConteos({
-        fotos: proyData.filter(p => p.categoria === 'Fotografía').length,
-        videos: proyData.filter(p => p.categoria === 'Video').length,
+        fotos: proyectosSoloMarcas.filter(p => p.categoria === 'Fotografía').length,
+        videos: proyectosSoloMarcas.filter(p => p.categoria === 'Video').length,
         youtube: 0, 
-        posts: proyData.filter(p => p.categoria === 'Posts').length,
+        posts: proyectosSoloMarcas.filter(p => p.categoria === 'Posts').length,
       });
     }
 
@@ -174,7 +183,7 @@ export default function Home() {
         </div>
       </header>
 
-      {/* SECCIONES PRINCIPALES: 2 columnas en móvil, 4 en PC */}
+      {/* SECCIONES PRINCIPALES: Solo cuentan proyectos de MARCAS */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
         <Link href="/fotos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <CameraIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
@@ -198,7 +207,7 @@ export default function Home() {
         </Link>
       </section>
       
-      {/* PRÓXIMAS ENTREGAS */}
+      {/* PRÓXIMAS ENTREGAS: Solo visualiza MARCAS */}
       <div className="bg-[#111] border border-gray-800 rounded-3xl p-4 md:p-8 shadow-2xl">
         <div className="flex items-center gap-2 mb-6 italic">
           <CalendarIcon className="h-6 w-6 text-purple-500" />
@@ -213,7 +222,7 @@ export default function Home() {
                     <h4 className="font-bold text-white text-base md:text-lg group-hover:text-purple-300 transition-colors uppercase italic">{proy.nombre}</h4>
                     <span className={`text-[8px] px-2 py-0.5 rounded-full border font-black uppercase ${getPrioridadColor(proy.prioridad)}`}>{proy.prioridad}</span>
                   </div>
-                  <p className="text-[10px] md:text-xs text-gray-500 font-medium uppercase">CLIENTE: {proy.cliente}</p>
+                  <p className="text-[10px] md:text-xs text-gray-500 font-medium uppercase">MARCA: {proy.cliente}</p>
                 </div>
                 <div className="text-left sm:text-right w-full sm:w-auto border-t sm:border-t-0 border-gray-800 pt-2 sm:pt-0">
                   <span className="block text-[10px] font-black text-purple-400 mb-1 uppercase tracking-widest">{proy.tipo}</span>
@@ -225,7 +234,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL NUEVO PROYECTO */}
+      {/* MODAL NUEVO PROYECTO: Aquí sí aparecen Marcas y Dueños */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
@@ -247,7 +256,7 @@ export default function Home() {
               </div>
 
               <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Cliente</label>
+                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Asignar a Marca/Dueño</label>
                 <select 
                   value={formData.cliente}
                   onChange={(e) => setFormData({...formData, cliente: e.target.value})}
