@@ -18,7 +18,7 @@ export default function PortalCliente() {
     const cookies = document.cookie.split('; ');
     const clienteIdCookie = cookies.find(row => row.startsWith('pache_cliente_id='));
     
-    // Este es el nombre o ID que el cliente usó para entrar
+    // Este es el nombre con el que el cliente entró (ANTONIO MATADAMAZ)
     const idSesion = clienteIdCookie ? decodeURIComponent(clienteIdCookie.split('=')[1]) : null;
 
     if (!idSesion) {
@@ -31,31 +31,36 @@ export default function PortalCliente() {
     const fetchContenidoVIP = async () => {
       setLoading(true);
       
-      // 1. BUSQUEDA INTELIGENTE DE MARCAS
-      // Buscamos todas las marcas donde:
-      // El nombre sea el del login O el dueno_id sea el del login O la pass sea la del login
-      const { data: marcasAsociadas } = await supabase
-        .from('clientes')
-        .select('nombre')
-        .or(`dueno_id.eq."${idSesion}",acceso_pass.eq."${idSesion}",nombre.eq."${idSesion}"`);
+      try {
+        // 1. BUSCAMOS TODAS LAS MARCAS QUE TENGAN ESE DUEÑO
+        // Buscamos en la tabla clientes donde el nombre sea el del login O el dueno_id sea el del login
+        const { data: marcasAsociadas } = await supabase
+          .from('clientes')
+          .select('nombre')
+          .or(`dueno_id.eq."${idSesion}",nombre.eq."${idSesion}",acceso_pass.eq."${idSesion}"`);
 
-      // Creamos la lista final de nombres de marcas a buscar en proyectos
-      const nombresParaBuscar = marcasAsociadas 
-        ? marcasAsociadas.map(m => m.nombre) 
-        : [];
-      
-      // También agregamos el ID de sesión por si hay proyectos directos
-      nombresParaBuscar.push(idSesion);
+        // Creamos una lista con todos los nombres posibles para buscar proyectos
+        let nombresParaBuscar = [idSesion];
+        if (marcasAsociadas) {
+          const nombresMarcas = marcasAsociadas.map(m => m.nombre);
+          nombresParaBuscar = [...nombresParaBuscar, ...nombresMarcas];
+        }
 
-      // 2. TRAER PROYECTOS
-      const { data: proyectos } = await supabase
-        .from('proyectos')
-        .select('*')
-        .in('cliente', nombresParaBuscar)
-        .order('fecha_entrega', { ascending: true });
-      
-      if (proyectos) setEventos(proyectos);
-      setLoading(false);
+        // 2. TRAEMOS PROYECTOS USANDO TODA ESA LISTA DE NOMBRES
+        const { data: proyectos, error } = await supabase
+          .from('proyectos')
+          .select('*')
+          .in('cliente', nombresParaBuscar)
+          .order('fecha_entrega', { ascending: true });
+        
+        if (proyectos) {
+          setEventos(proyectos);
+        }
+      } catch (err) {
+        console.error("Error cargando portal:", err);
+      } finally {
+        setLoading(false);
+      }
     };
 
     fetchContenidoVIP();
@@ -86,39 +91,42 @@ export default function PortalCliente() {
       </header>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {eventos.length > 0 ? eventos.map((item) => (
-          <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all">
-            <div className="flex justify-between items-start mb-4">
-              <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
-                item.categoria === 'Video' ? 'border-orange-500 text-orange-400 bg-orange-500/10' :
-                'border-blue-500 text-blue-400 bg-blue-500/10'
-              }`}>
-                {item.categoria}
-              </span>
-              <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]">
-                <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PRÓXIMAMENTE"}
+        {eventos.length > 0 ? (
+          eventos.map((item) => (
+            <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all animate-in fade-in zoom-in duration-300">
+              <div className="flex justify-between items-start mb-4">
+                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                  item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
+                  item.categoria === 'Video' ? 'border-orange-500 text-orange-400 bg-orange-500/10' :
+                  'border-blue-500 text-blue-400 bg-blue-500/10'
+                }`}>
+                  {item.categoria}
+                </span>
+                <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]">
+                  <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PRÓXIMAMENTE"}
+                </div>
+              </div>
+
+              <h3 className="text-xl font-bold uppercase italic mb-1 truncate">{item.titulo}</h3>
+              <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-4 flex items-center gap-1">
+                <RectangleGroupIcon className="h-3 w-3" /> {item.cliente}
+              </p>
+
+              <div className="space-y-4">
+                 <p className="text-gray-400 text-xs italic leading-relaxed line-clamp-2">{item.descripcion || "Producción en proceso..."}</p>
+                 <div className="bg-black/40 border border-gray-800 rounded-2xl p-4 text-center">
+                    <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
+                    <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' ? 'text-green-400' : 'text-purple-400'}`}>
+                      {item.estado}
+                    </span>
+                 </div>
               </div>
             </div>
-
-            <h3 className="text-xl font-bold uppercase italic mb-1 truncate">{item.titulo}</h3>
-            <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-4 flex items-center gap-1">
-              <RectangleGroupIcon className="h-3 w-3" /> {item.cliente}
-            </p>
-
-            <div className="space-y-4">
-               <p className="text-gray-400 text-xs italic leading-relaxed line-clamp-2">{item.descripcion || "Producción en proceso..."}</p>
-               <div className="bg-black/40 border border-gray-800 rounded-2xl p-4 text-center">
-                  <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
-                  <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' ? 'text-green-400' : 'text-purple-400'}`}>
-                    {item.estado}
-                  </span>
-               </div>
-            </div>
-          </div>
-        )) : (
-          <div className="col-span-full text-center py-20 bg-[#111]/50 rounded-[3rem] border border-dashed border-gray-800">
+          ))
+        ) : (
+          <div className="col-span-full text-center py-20 bg-[#111]/50 rounded-[3rem] border border-dashed border-gray-800 animate-pulse">
             <p className="text-gray-600 italic uppercase font-black text-sm tracking-widest">No hay contenido programado para tus marcas</p>
+            <p className="text-gray-700 text-[10px] mt-2 font-bold uppercase">Verifica que tus marcas estén vinculadas correctamente a tu perfil.</p>
           </div>
         )}
       </div>
