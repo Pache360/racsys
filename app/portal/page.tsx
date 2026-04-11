@@ -18,7 +18,7 @@ export default function PortalCliente() {
     const cookies = document.cookie.split('; ');
     const clienteIdCookie = cookies.find(row => row.startsWith('pache_cliente_id='));
     
-    // Este es el nombre con el que el cliente entró (ANTONIO MATADAMAZ)
+    // Obtenemos el nombre del login (ANTONIO MATADAMAZ)
     const idSesion = clienteIdCookie ? decodeURIComponent(clienteIdCookie.split('=')[1]) : null;
 
     if (!idSesion) {
@@ -32,32 +32,40 @@ export default function PortalCliente() {
       setLoading(true);
       
       try {
-        // 1. BUSCAMOS TODAS LAS MARCAS QUE TENGAN ESE DUEÑO
-        // Buscamos en la tabla clientes donde el nombre sea el del login O el dueno_id sea el del login
+        // 1. Buscamos al cliente en la DB para obtener su dueno_id o sus marcas
+        const { data: clienteDB } = await supabase
+          .from('clientes')
+          .select('*')
+          .eq('nombre', idSesion)
+          .single();
+
+        // 2. Buscamos todas las marcas relacionadas (por nombre o por dueno_id)
         const { data: marcasAsociadas } = await supabase
           .from('clientes')
           .select('nombre')
-          .or(`dueno_id.eq."${idSesion}",nombre.eq."${idSesion}",acceso_pass.eq."${idSesion}"`);
+          .or(`dueno_id.eq."${idSesion}",dueno_id.eq."${clienteDB?.acceso_pass || 'N/A'}",nombre.eq."${idSesion}"`);
 
-        // Creamos una lista con todos los nombres posibles para buscar proyectos
-        let nombresParaBuscar = [idSesion];
-        if (marcasAsociadas) {
-          const nombresMarcas = marcasAsociadas.map(m => m.nombre);
-          nombresParaBuscar = [...nombresParaBuscar, ...nombresMarcas];
-        }
+        const listaNombres = marcasAsociadas ? marcasAsociadas.map(m => m.nombre) : [idSesion];
+        if (!listaNombres.includes(idSesion)) listaNombres.push(idSesion);
 
-        // 2. TRAEMOS PROYECTOS USANDO TODA ESA LISTA DE NOMBRES
-        const { data: proyectos, error } = await supabase
+        // 3. BUSQUEDA SUPER FLEXIBLE DE PROYECTOS
+        // Traemos todos los proyectos y filtramos en el cliente para evitar errores de coincidencia exacta
+        const { data: todosLosProyectos } = await supabase
           .from('proyectos')
-          .select('*')
-          .in('cliente', nombresParaBuscar)
-          .order('fecha_entrega', { ascending: true });
-        
-        if (proyectos) {
-          setEventos(proyectos);
+          .select('*');
+
+        if (todosLosProyectos) {
+          const filtrados = todosLosProyectos.filter(proy => {
+            const pCliente = proy.cliente?.toLowerCase() || "";
+            // Si el nombre del proyecto contiene el nombre del dueño o viceversa
+            return listaNombres.some(n => 
+              pCliente.includes(n.toLowerCase()) || n.toLowerCase().includes(pCliente)
+            );
+          });
+          setEventos(filtrados);
         }
       } catch (err) {
-        console.error("Error cargando portal:", err);
+        console.error("Error:", err);
       } finally {
         setLoading(false);
       }
@@ -82,10 +90,10 @@ export default function PortalCliente() {
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
       <header className="flex justify-between items-center mb-10 border-b border-white/5 pb-6">
         <div>
-          <h1 className="text-2xl font-black italic uppercase tracking-tighter">Portal <span className="text-purple-500">PACHE360</span></h1>
-          <p className="text-gray-500 text-[10px] font-black uppercase tracking-[0.2em]">Bienvenido, {duenoNombre}</p>
+          <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white">PORTAL <span className="text-purple-500">PACHE360</span></h1>
+          <p className="text-gray-400 text-[10px] font-bold uppercase tracking-[0.2em] mt-1">BIENVENIDO, {duenoNombre}</p>
         </div>
-        <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-3 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all">
+        <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-3 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95">
           <ArrowRightOnRectangleIcon className="h-5 w-5" />
         </button>
       </header>
@@ -93,7 +101,7 @@ export default function PortalCliente() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {eventos.length > 0 ? (
           eventos.map((item) => (
-            <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/30 transition-all animate-in fade-in zoom-in duration-300">
+            <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all duration-300">
               <div className="flex justify-between items-start mb-4">
                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                   item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
@@ -107,14 +115,14 @@ export default function PortalCliente() {
                 </div>
               </div>
 
-              <h3 className="text-xl font-bold uppercase italic mb-1 truncate">{item.titulo}</h3>
-              <p className="text-[9px] font-black text-gray-600 uppercase tracking-widest mb-4 flex items-center gap-1">
-                <RectangleGroupIcon className="h-3 w-3" /> {item.cliente}
+              <h3 className="text-xl font-bold uppercase italic mb-1 text-white">{item.titulo}</h3>
+              <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1">
+                <RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}
               </p>
 
               <div className="space-y-4">
-                 <p className="text-gray-400 text-xs italic leading-relaxed line-clamp-2">{item.descripcion || "Producción en proceso..."}</p>
-                 <div className="bg-black/40 border border-gray-800 rounded-2xl p-4 text-center">
+                 <p className="text-gray-400 text-xs italic leading-relaxed line-clamp-2">{item.descripcion || "Producción en curso..."}</p>
+                 <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
                     <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
                     <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' ? 'text-green-400' : 'text-purple-400'}`}>
                       {item.estado}
@@ -124,9 +132,9 @@ export default function PortalCliente() {
             </div>
           ))
         ) : (
-          <div className="col-span-full text-center py-20 bg-[#111]/50 rounded-[3rem] border border-dashed border-gray-800 animate-pulse">
+          <div className="col-span-full text-center py-24 bg-[#111]/30 rounded-[3rem] border border-dashed border-gray-800">
             <p className="text-gray-600 italic uppercase font-black text-sm tracking-widest">No hay contenido programado para tus marcas</p>
-            <p className="text-gray-700 text-[10px] mt-2 font-bold uppercase">Verifica que tus marcas estén vinculadas correctamente a tu perfil.</p>
+            <p className="text-gray-700 text-[10px] mt-4 font-bold uppercase">Asegúrate de que tus proyectos en el Dashboard coincidan con tu nombre de marca.</p>
           </div>
         )}
       </div>
