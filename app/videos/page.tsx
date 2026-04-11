@@ -17,7 +17,6 @@ export default function VideosPage() {
 
   const listaEstados = ['Cotización', 'Autorización', 'Planeación', 'Tomas', 'Edición', 'Revisión', 'Cambios', 'Entregado'];
 
-  // FUNCIÓN PARA CONVERTIR LINKS DE YOUTUBE A FORMATO EMBED
   const formatVideoUrl = (url: string) => {
     if (!url) return "";
     if (url.includes('youtube.com/embed/')) return url;
@@ -44,7 +43,6 @@ export default function VideosPage() {
         id: p.id,
         titulo: p.titulo,
         cliente: p.cliente,
-        // Aplicamos el formato de embed al cargar
         videoUrl: formatVideoUrl(p.logo_url || p.descripcion), 
         estado: p.estado || "Cotización",
         prioridad: p.prioridad || "Normal"
@@ -104,52 +102,53 @@ export default function VideosPage() {
   );
 
   return (
-    <main className="min-h-screen bg-[#0a0a0a] text-white p-8">
-      <div className="mb-8 flex justify-between items-center">
-        <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all w-fit font-bold text-sm uppercase italic">
+    <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
+      {/* NAVEGACIÓN Y FILTRO RESPONSIVO */}
+      <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all w-fit font-bold text-[10px] md:text-sm uppercase italic">
           <ArrowLeftIcon className="h-4 w-4" />
           <span>Volver al Dashboard</span>
         </Link>
 
-        <div className="relative group">
+        <div className="relative group w-full sm:w-auto">
           <FunnelIcon className="h-4 w-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 group-focus-within:text-purple-400 transition-colors" />
           <input 
             type="text"
             placeholder="Filtrar por marca..."
             value={filtroMarca}
             onChange={(e) => setFiltroMarca(e.target.value)}
-            className="bg-[#111] border border-gray-800 rounded-xl py-2 pl-10 pr-4 text-xs outline-none focus:border-purple-500 transition-all w-64"
+            className="bg-[#111] border border-gray-800 rounded-xl py-3 md:py-2 pl-10 pr-4 text-xs outline-none focus:border-purple-500 transition-all w-full sm:w-64 text-white"
           />
         </div>
       </div>
 
-      <header className="flex justify-between items-center mb-10">
-        <div className="flex items-center gap-4">
-          <div className="bg-purple-600 p-3 rounded-2xl">
-            <VideoCameraIcon className="h-8 w-8 text-white" />
-          </div>
-          <div>
-            <h1 className="text-3xl font-bold italic uppercase tracking-tighter">Producción de Video</h1>
-            <p className="text-gray-500 text-sm tracking-[0.2em] font-black">PACHE360 STUDIO</p>
-          </div>
+      <header className="flex items-center gap-4 mb-10">
+        <div className="bg-purple-600 p-2 md:p-3 rounded-xl md:rounded-2xl">
+          <VideoCameraIcon className="h-6 w-6 md:h-8 md:w-8 text-white" />
+        </div>
+        <div>
+          <h1 className="text-2xl md:text-3xl font-bold italic uppercase tracking-tighter leading-none">Producción de Video</h1>
+          <p className="text-gray-500 text-[8px] md:text-sm tracking-[0.2em] font-black uppercase mt-1">PACHE360 STUDIO</p>
         </div>
       </header>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      {/* GRID DE VIDEOS: 1 columna en móvil, 2 en pantallas grandes */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         {proyectosFiltrados.map((proy) => (
           <div key={proy.id} className="bg-[#111] rounded-3xl overflow-hidden border border-gray-800 hover:border-purple-500/50 transition-all group relative shadow-2xl">
             
-            <div className="absolute top-4 left-4 z-20 flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+            {/* ACCIONES SIEMPRE VISIBLES EN MÓVIL */}
+            <div className="absolute top-4 left-4 z-20 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <Link href={`/proyecto/${proy.id}`} className="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 hover:text-purple-400 transition-colors">
-                <PencilIcon className="h-4 w-4" />
+                <PencilIcon className="h-4 w-4 text-white" />
               </Link>
               <button onClick={() => deleteVideo(proy.id)} className="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 hover:text-red-500 transition-colors">
-                <TrashIcon className="h-4 w-4" />
+                <TrashIcon className="h-4 w-4 text-white" />
               </button>
             </div>
 
             <div className="aspect-video bg-black flex items-center justify-center relative">
-              <div className={`absolute top-4 right-4 z-10 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${getPrioridadEstilo(proy.prioridad)}`}>
+              <div className={`absolute top-4 right-4 z-10 backdrop-blur-md px-3 py-1 rounded-full text-[8px] md:text-[10px] font-black uppercase tracking-widest border ${getPrioridadEstilo(proy.prioridad)}`}>
                 {proy.prioridad}
               </div>
               
@@ -163,27 +162,27 @@ export default function VideosPage() {
                 ></iframe>
               ) : (
                 <div className="text-center">
-                  <PlayIcon className="h-12 w-12 text-gray-800 mx-auto mb-2" />
-                  <p className="text-gray-700 text-sm font-bold uppercase italic tracking-widest">Esperando material...</p>
+                  <PlayIcon className="h-10 w-10 md:h-12 md:w-12 text-gray-800 mx-auto mb-2" />
+                  <p className="text-gray-700 text-xs font-bold uppercase italic tracking-widest">Esperando material...</p>
                 </div>
               )}
             </div>
 
-            <div className="p-6">
+            <div className="p-5 md:p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-xl font-bold text-purple-100 uppercase italic group-hover:text-purple-400 transition-colors">{proy.titulo}</h3>
-                  <p className="text-gray-500 text-sm italic font-medium">Cliente: {proy.cliente}</p>
+                  <h3 className="text-lg md:text-xl font-bold mb-1 text-purple-100 uppercase italic group-hover:text-purple-400 transition-colors truncate max-w-[250px] md:max-w-none">{proy.titulo}</h3>
+                  <p className="text-gray-500 text-xs md:text-sm italic font-medium uppercase">Cliente: {proy.cliente}</p>
                 </div>
               </div>
               
               <div className="flex flex-col gap-3">
-                <span className="text-[10px] uppercase text-gray-500 font-bold tracking-widest">Fase del Proyecto</span>
+                <span className="text-[9px] md:text-[10px] uppercase text-gray-500 font-bold tracking-widest">Fase del Proyecto</span>
                 
                 <select 
                   value={proy.estado}
                   onChange={(e) => updateEstado(proy.id, e.target.value)}
-                  className={`w-full text-center py-2.5 px-4 rounded-xl border font-bold text-xs uppercase tracking-widest ${getEstadoColor(proy.estado)} bg-transparent cursor-pointer outline-none appearance-none hover:bg-white/5 transition-colors shadow-inner`}
+                  className={`w-full text-center py-3 md:py-2.5 px-4 rounded-xl border font-bold text-[10px] md:text-xs uppercase tracking-widest ${getEstadoColor(proy.estado)} bg-transparent cursor-pointer outline-none appearance-none hover:bg-white/5 transition-colors shadow-inner`}
                 >
                   {listaEstados.map(est => (
                     <option key={est} value={est} className="bg-[#0a0a0a] text-white">
@@ -198,7 +197,7 @@ export default function VideosPage() {
       </div>
 
       {proyectosFiltrados.length === 0 && (
-        <div className="text-center py-20 text-gray-600 italic uppercase font-black tracking-widest opacity-50">
+        <div className="text-center py-20 text-gray-600 italic uppercase font-black tracking-widest opacity-50 text-xs md:text-sm">
           No hay producciones de video bajo esa marca.
         </div>
       )}

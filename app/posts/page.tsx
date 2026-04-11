@@ -9,7 +9,8 @@ import {
   TrashIcon,
   FunnelIcon,
   XMarkIcon,
-  PhotoIcon
+  PhotoIcon,
+  PlusIcon
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
@@ -20,10 +21,8 @@ export default function PostsPage() {
   const [filtroMarca, setFiltroMarca] = useState('');
   const [listaClientes, setListaClientes] = useState<any[]>([]);
   
-  // Estados para el Calendario Real
   const [diasSemanaActual, setDiasSemanaActual] = useState<{ nombre: string, fechaFull: string, soloDia: number }[]>([]);
 
-  // --- CORRECCIÓN AQUÍ: Agregamos soloDia a la interfaz del estado ---
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '' });
@@ -118,49 +117,70 @@ export default function PostsPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4">
-      <div className="mb-4 flex justify-between items-center">
-        <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-xs font-bold uppercase"><ArrowLeftIcon className="h-3 w-3" /> Dashboard</Link>
-        <div className="relative">
-          <FunnelIcon className="h-3 w-3 absolute left-2 top-1/2 -translate-y-1/2 text-gray-600" />
-          <input type="text" placeholder="FILTRAR MARCA..." value={filtroMarca} onChange={(e) => setFiltroMarca(e.target.value)} className="bg-[#111] border border-gray-800 rounded-lg py-1 pl-7 pr-3 text-[10px] outline-none w-40 font-bold uppercase" />
+      {/* NAVEGACIÓN Y FILTRO */}
+      <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-[10px] font-bold uppercase tracking-widest">
+          <ArrowLeftIcon className="h-3 w-3" /> Volver al Dashboard
+        </Link>
+        <div className="relative w-full sm:w-auto">
+          <FunnelIcon className="h-3 w-3 absolute left-3 top-1/2 -translate-y-1/2 text-gray-600" />
+          <input 
+            type="text" 
+            placeholder="FILTRAR POR MARCA..." 
+            value={filtroMarca} 
+            onChange={(e) => setFiltroMarca(e.target.value)} 
+            className="bg-[#111] border border-gray-800 rounded-xl py-2 pl-9 pr-3 text-[10px] outline-none w-full sm:w-48 font-bold uppercase focus:border-purple-500 transition-all" 
+          />
         </div>
       </div>
 
-      <header className="mb-6 flex items-center gap-3">
-        <div className="bg-purple-600 p-2 rounded-xl"><ChatBubbleLeftRightIcon className="h-6 w-6 text-white" /></div>
+      <header className="mb-8 flex items-center gap-4">
+        <div className="bg-purple-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-purple-600/20">
+          <ChatBubbleLeftRightIcon className="h-6 w-6 md:h-7 md:w-7 text-white" />
+        </div>
         <div>
-          <h1 className="text-2xl font-bold italic uppercase tracking-tighter">Calendario Semanal</h1>
-          <p className="text-gray-500 text-[10px] tracking-[0.3em] font-black uppercase">Semana Real / PACHE360 STUDIO</p>
+          <h1 className="text-xl md:text-3xl font-bold italic uppercase tracking-tighter leading-none">Calendario Semanal</h1>
+          <p className="text-gray-500 text-[8px] md:text-[10px] tracking-[0.2em] font-black uppercase mt-1">Planificación / PACHE360 STUDIO</p>
         </div>
       </header>
 
-      <div className="grid grid-cols-7 gap-2 w-full">
+      {/* CALENDARIO: Scroll horizontal en móvil, Grid 7 en PC */}
+      <div className="flex overflow-x-auto pb-6 gap-3 md:grid md:grid-cols-7 md:gap-2 w-full snap-x scrollbar-hide">
         {diasSemanaActual.map((dia) => (
-          <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-2 flex flex-col gap-3">
+          <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-3 flex flex-col gap-3 min-w-[260px] md:min-w-0 snap-center">
             <div className="text-center border-b border-gray-800/50 pb-2">
-                <h3 className="font-black text-gray-600 uppercase tracking-widest text-[10px]">{dia.nombre}</h3>
-                <span className="text-[14px] font-mono text-purple-500 font-bold">{dia.soloDia}</span>
+                <h3 className="font-black text-gray-600 uppercase tracking-widest text-[9px]">{dia.nombre}</h3>
+                <span className="text-[16px] font-mono text-purple-500 font-bold">{dia.soloDia}</span>
             </div>
             
-            <div className="flex flex-col gap-2 min-h-[70vh]">
+            <div className="flex flex-col gap-3 min-h-[60vh] md:min-h-[70vh]">
               {postsFiltrados.filter(p => p.fecha_entrega === dia.fechaFull).map((post) => (
                 <div key={post.id} className="bg-[#161616] border border-gray-800 rounded-xl hover:border-purple-500/50 transition-all relative group overflow-hidden shadow-lg">
                   {post.imagen && (
-                    <div className="h-24 w-full overflow-hidden border-b border-gray-800">
+                    <div className="h-28 w-full overflow-hidden border-b border-gray-800">
                       <img src={post.imagen} alt="diseño" className="w-full h-full object-cover opacity-80 group-hover:opacity-100 transition-opacity" />
                     </div>
                   )}
                   
                   <div className="p-3">
-                    <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                      <Link href={`/proyecto/${post.id}`} className="p-1 bg-gray-800 rounded hover:text-purple-400"><PencilIcon className="h-3 w-3" /></Link>
-                      <button onClick={() => deletePost(post.id)} className="p-1 bg-gray-800 rounded hover:text-red-500"><TrashIcon className="h-3 w-3" /></button>
+                    {/* ACCIONES SIEMPRE VISIBLES EN MÓVIL */}
+                    <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
+                      <Link href={`/proyecto/${post.id}`} className="p-1.5 bg-black/60 rounded-lg hover:text-purple-400 text-gray-400">
+                        <PencilIcon className="h-3 w-3" />
+                      </Link>
+                      <button onClick={() => deletePost(post.id)} className="p-1.5 bg-black/60 rounded-lg hover:text-red-500 text-gray-400">
+                        <TrashIcon className="h-3 w-3" />
+                      </button>
                     </div>
 
-                    <h4 className="text-[10px] font-bold text-purple-100 mb-1 leading-tight uppercase italic truncate">{post.titulo}</h4>
-                    <p className="text-[8px] text-gray-500 font-bold uppercase mb-2">{post.cliente}</p>
+                    <h4 className="text-[10px] font-bold text-purple-100 mb-1 leading-tight uppercase italic pr-8">{post.titulo}</h4>
+                    <p className="text-[8px] text-gray-500 font-bold uppercase mb-3">{post.cliente}</p>
                     
-                    <select value={post.estado} className={`w-full text-[8px] font-bold py-1 rounded border border-opacity-20 outline-none appearance-none text-center cursor-pointer ${getEstadoColor(post.estado)}`} onChange={(e) => updateEstado(post.id, e.target.value)}>
+                    <select 
+                      value={post.estado} 
+                      className={`w-full text-[8px] font-black py-2 rounded-lg border border-opacity-20 outline-none appearance-none text-center cursor-pointer ${getEstadoColor(post.estado)}`} 
+                      onChange={(e) => updateEstado(post.id, e.target.value)}
+                    >
                       {estados.map(est => <option key={est} value={est} className="bg-[#0a0a0a]">{est}</option>)}
                     </select>
                   </div>
@@ -168,39 +188,44 @@ export default function PostsPage() {
               ))}
               <button 
                 onClick={() => { setDiaSeleccionado(dia); setIsModalOpen(true); }} 
-                className="mt-auto py-1 border border-dashed border-gray-800/50 rounded-lg text-gray-700 hover:text-purple-400 hover:border-purple-400/30 transition-all text-[9px] font-bold uppercase tracking-widest"
+                className="mt-auto py-3 border border-dashed border-gray-800/50 rounded-xl text-gray-700 hover:text-purple-400 hover:border-purple-400/30 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
               >
-                + POST
+                <PlusIcon className="h-3 w-3" /> Nuevo Post
               </button>
             </div>
           </div>
         ))}
       </div>
 
+      {/* MODAL CREAR POST: Estilo Drawer en móvil */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-purple-500/30 w-full max-w-sm rounded-3xl overflow-hidden shadow-2xl">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
+          <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-[2rem] md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
-              <h2 className="text-sm font-bold text-purple-400 uppercase italic">Crear Post: {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia}</h2>
-              <button onClick={() => setIsModalOpen(false)}><XMarkIcon className="h-5 w-5 text-gray-500" /></button>
+              <h2 className="text-xs md:text-sm font-bold text-purple-400 uppercase italic">
+                {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia} • Crear Post
+              </h2>
+              <button onClick={() => setIsModalOpen(false)} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
-            <div className="p-6 space-y-4">
+            <div className="p-6 md:p-8 space-y-5 pb-10 md:pb-8">
               <div>
-                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1 block">Marca Registrada</label>
-                <select value={nuevoPost.cliente} onChange={e => setNuevoPost({...nuevoPost, cliente: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 text-xs outline-none focus:border-purple-500 font-bold uppercase">
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Marca del Cliente</label>
+                <select value={nuevoPost.cliente} onChange={e => setNuevoPost({...nuevoPost, cliente: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold uppercase text-white">
                   <option value="">Selecciona Marca...</option>
                   {listaClientes.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
                 </select>
               </div>
               <div>
-                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1 block">Título del Post</label>
-                <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 text-xs outline-none focus:border-purple-500 font-bold" />
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Título del Post</label>
+                <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold text-white" />
               </div>
               <div>
-                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-1 block">URL del Diseño (Imagen)</label>
-                <input type="text" value={nuevoPost.url_diseno} onChange={e => setNuevoPost({...nuevoPost, url_diseno: e.target.value})} placeholder="https://..." className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 text-xs outline-none focus:border-purple-500 font-mono" />
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">URL de la Imagen (Opcional)</label>
+                <input type="text" value={nuevoPost.url_diseno} onChange={e => setNuevoPost({...nuevoPost, url_diseno: e.target.value})} placeholder="https://..." className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-mono text-white" />
               </div>
-              <button onClick={handlePostRapido} className="w-full bg-purple-600 hover:bg-purple-500 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all shadow-lg shadow-purple-600/20">Crear Post</button>
+              <button onClick={handlePostRapido} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-white">
+                Confirmar Parrilla
+              </button>
             </div>
           </div>
         </div>
