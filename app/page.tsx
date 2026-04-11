@@ -1,14 +1,16 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation'; // Importamos useRouter para redirigir
 import { supabase } from '@/lib/supabase';
 import { 
   CameraIcon, VideoCameraIcon, PlusIcon, PlayIcon, 
   ChatBubbleLeftRightIcon, CalendarIcon, XMarkIcon,
-  UserGroupIcon 
+  UserGroupIcon, ArrowRightOnRectangleIcon // Importamos icono de salida
 } from '@heroicons/react/24/outline';
 
 export default function Home() {
+  const router = useRouter(); // Inicializamos el router
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [categoria, setCategoria] = useState('Fotografía');
   const [loading, setLoading] = useState(false);
@@ -31,6 +33,13 @@ export default function Home() {
     nuevoClienteCorreo: '',
     nuevoClienteLogo: ''
   });
+
+  // FUNCIÓN PARA CERRAR SESIÓN (NUEVA)
+  const handleLogout = () => {
+    // Borramos la cookie de autenticación expirándola inmediatamente
+    document.cookie = "pache_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict";
+    router.push('/login'); // Mandamos al usuario al login
+  };
 
   const fetchDatos = async () => {
     const { data: proyData } = await supabase
@@ -140,7 +149,15 @@ export default function Home() {
           <p className="text-gray-400 text-sm mt-1 uppercase tracking-widest font-bold">Panel de Control Creativo</p>
         </div>
         
-        <div className="flex flex-col sm:flex-row items-center gap-4 w-full md:w-auto">
+        <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* BOTÓN CERRAR SESIÓN (NUEVO) */}
+          <button 
+            onClick={handleLogout}
+            className="flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-500/30 px-4 py-3 rounded-xl font-bold transition-all active:scale-95 text-xs uppercase w-full sm:w-auto"
+          >
+            <ArrowRightOnRectangleIcon className="h-4 w-4" /> Salir
+          </button>
+
           <Link 
             href="/clients" 
             className="flex items-center justify-center gap-2 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-500/30 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 text-sm italic uppercase tracking-tight w-full sm:w-auto"
@@ -181,7 +198,7 @@ export default function Home() {
         </Link>
       </section>
       
-      {/* PRÓXIMAS ENTREGAS: Ajuste de padding para pantallas chicas */}
+      {/* PRÓXIMAS ENTREGAS */}
       <div className="bg-[#111] border border-gray-800 rounded-3xl p-4 md:p-8 shadow-2xl">
         <div className="flex items-center gap-2 mb-6 italic">
           <CalendarIcon className="h-6 w-6 text-purple-500" />
@@ -208,7 +225,7 @@ export default function Home() {
         </div>
       </div>
 
-      {/* MODAL NUEVO PROYECTO: Optimizado para scroll en móvil */}
+      {/* MODAL NUEVO PROYECTO */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
