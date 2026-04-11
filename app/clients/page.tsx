@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeftIcon, UserGroupIcon, PencilIcon, 
   TrashIcon, PhoneIcon, PlusIcon, XMarkIcon,
-  BanknotesIcon, TagIcon
+  BanknotesIcon, TagIcon, Cog6ToothIcon
 } from '@heroicons/react/24/outline';
 
 export default function ClientesPage() {
@@ -13,6 +13,9 @@ export default function ClientesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
+
+  // NUEVO: Modo gestión para habilitar edición/eliminación
+  const [modoGestion, setModoGestion] = useState(false);
 
   // NUEVO: Estado para diferenciar si creamos Dueño o Marca
   const [tipoRegistro, setTipoRegistro] = useState<'Dueño' | 'Marca'>('Dueño');
@@ -82,7 +85,7 @@ export default function ClientesPage() {
   };
 
   const deleteCliente = async (id: string) => {
-    if (confirm('¿Eliminar registro?')) {
+    if (confirm('¿Deseas eliminar este registro de forma permanente?')) {
       await supabase.from('clientes').delete().eq('id', id);
       fetchClientes();
     }
@@ -98,7 +101,7 @@ export default function ClientesPage() {
         </Link>
       </div>
 
-      {/* HEADER RESPONSIVO */}
+      {/* HEADER RESPONSIVO CON BOTÓN DE GESTIÓN */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-10 gap-6">
         <div className="flex items-center gap-4">
           <div className="bg-cyan-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-cyan-600/20 italic">
@@ -106,12 +109,24 @@ export default function ClientesPage() {
           </div>
           <h1 className="text-2xl md:text-3xl font-bold italic uppercase tracking-tighter">Clientes y Marcas</h1>
         </div>
-        <button 
-          onClick={() => handleOpenModal()} 
-          className="w-full sm:w-auto bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs md:text-sm italic shadow-lg shadow-cyan-600/20"
-        >
-          <PlusIcon className="h-5 w-5" /> NUEVO REGISTRO
-        </button>
+
+        <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+          {/* BOTÓN GESTIONAR LISTA (NUEVO) */}
+          <button 
+            onClick={() => setModoGestion(!modoGestion)}
+            className={`flex items-center justify-center gap-2 px-6 py-3 rounded-xl font-bold transition-all text-xs md:text-sm italic shadow-lg ${modoGestion ? 'bg-orange-600 text-white shadow-orange-600/20' : 'bg-gray-800 text-gray-400 border border-gray-700'}`}
+          >
+            <Cog6ToothIcon className={`h-5 w-5 ${modoGestion ? 'animate-spin' : ''}`} />
+            {modoGestion ? 'CERRAR GESTIÓN' : 'GESTIONAR LISTA'}
+          </button>
+
+          <button 
+            onClick={() => handleOpenModal()} 
+            className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold transition-all flex items-center justify-center gap-2 text-xs md:text-sm italic shadow-lg shadow-cyan-600/20"
+          >
+            <PlusIcon className="h-5 w-5" /> NUEVO REGISTRO
+          </button>
+        </div>
       </header>
 
       {/* GRID DE CLIENTES / MARCAS */}
@@ -122,16 +137,19 @@ export default function ClientesPage() {
           const esDueno = !c.dueno_id || c.dueno_id === '';
           
           return (
-            <div key={c.id} className={`bg-[#111] border ${esDueno ? 'border-purple-500/20' : 'border-gray-800'} rounded-3xl p-5 md:p-6 hover:border-cyan-500/40 transition-all group relative shadow-2xl`}>
-              {/* ACCIONES */}
-              <div className="absolute top-4 right-4 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-all">
-                <button onClick={() => handleOpenModal(c)} className="p-2 bg-gray-900 rounded-xl hover:text-cyan-400 border border-gray-800 transition-colors">
-                  <PencilIcon className="h-4 w-4" />
-                </button>
-                <button onClick={() => deleteCliente(c.id)} className="p-2 bg-gray-900 rounded-xl hover:text-red-500 border border-gray-800 transition-colors">
-                  <TrashIcon className="h-4 w-4" />
-                </button>
-              </div>
+            <div key={c.id} className={`bg-[#111] border ${esDueno ? 'border-purple-500/20' : 'border-gray-800'} ${modoGestion ? 'border-orange-500/50' : ''} rounded-3xl p-5 md:p-6 hover:border-cyan-500/40 transition-all group relative shadow-2xl`}>
+              
+              {/* ACCIONES: Solo visibles o resaltadas en modo gestión */}
+              {modoGestion && (
+                <div className="absolute top-4 right-4 flex gap-2 animate-in fade-in zoom-in duration-200">
+                  <button onClick={() => handleOpenModal(c)} className="p-2 bg-gray-900 rounded-xl hover:text-cyan-400 border border-gray-800 transition-colors shadow-xl">
+                    <PencilIcon className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => deleteCliente(c.id)} className="p-2 bg-gray-900 rounded-xl hover:text-red-500 border border-gray-800 transition-colors shadow-xl">
+                    <TrashIcon className="h-4 w-4" />
+                  </button>
+                </div>
+              )}
 
               <div className="flex items-center gap-4 mb-6">
                 <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl md:rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center overflow-hidden font-black italic text-gray-500 shadow-inner shrink-0">
@@ -139,7 +157,7 @@ export default function ClientesPage() {
                 </div>
                 <div className="pr-12 sm:pr-0">
                   <div className="flex items-center gap-2">
-                    <h3 className="font-bold text-lg md:text-xl uppercase italic leading-none truncate max-w-[120px]">{c.nombre}</h3>
+                    <h3 className="font-bold text-lg md:text-xl uppercase italic leading-none truncate max-w-30">{c.nombre}</h3>
                     <span className={`text-[7px] px-1.5 py-0.5 rounded-md border font-black ${esDueno ? 'border-purple-500 text-purple-400 bg-purple-500/10' : 'border-gray-600 text-gray-500'}`}>
                       {esDueno ? 'DUEÑO' : 'MARCA'}
                     </span>
@@ -181,7 +199,7 @@ export default function ClientesPage() {
       {/* MODAL DE EDICIÓN / AGREGAR */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
-          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-[2rem] sm:rounded-[2.5rem] shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
+          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-4xl sm:rounded-4xl shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
             <div className="p-6 md:p-8 flex flex-col gap-4 bg-[#161616]">
               <div className="flex justify-between items-center">
                 <h2 className="text-xl md:text-2xl font-black text-cyan-400 uppercase italic tracking-tighter">
@@ -192,7 +210,6 @@ export default function ClientesPage() {
                 </button>
               </div>
               
-              {/* SELECTOR DE TIPO */}
               <div className="flex gap-2 bg-black p-1 rounded-xl">
                 {['Dueño', 'Marca'].map((tipo) => (
                   <button
