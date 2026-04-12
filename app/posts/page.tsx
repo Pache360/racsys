@@ -30,6 +30,8 @@ export default function PostsPage() {
   
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '' });
   const [uploading, setUploading] = useState(false);
+  // NUEVO: Estado para saber si estamos editando
+  const [idEditando, setIdEditando] = useState<string | null>(null);
 
   const generarSemana = () => {
     const domingo = new Date(fechaBase);
@@ -81,7 +83,19 @@ export default function PostsPage() {
     fetchPosts(); 
   }, [fechaBase]);
 
-  // FUNCIÓN DE SUBIDA ACTIVA
+  // FUNCIÓN PARA CARGAR DATOS EN EL MODAL PARA EDITAR
+  const abrirEdicion = (post: any) => {
+    const dia = diasSemanaActual.find(d => d.fechaFull === post.fecha_entrega) || null;
+    setDiaSeleccionado(dia);
+    setNuevoPost({
+      titulo: post.titulo,
+      cliente: post.cliente,
+      url_diseno: post.imagen || ''
+    });
+    setIdEditando(post.id);
+    setIsModalOpen(true);
+  };
+
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
@@ -92,7 +106,6 @@ export default function PostsPage() {
       const fileName = `${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
       const filePath = `posts/${fileName}`;
 
-      // Subida al bucket 'disenos' ya configurado en tu Supabase
       const { error: uploadError } = await supabase.storage
         .from('disenos')
         .upload(filePath, file);
@@ -117,23 +130,34 @@ export default function PostsPage() {
   const handlePostRapido = async () => {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
     
-    const { error } = await supabase.from('proyectos').insert([{
-      titulo: nuevoPost.titulo,
-      cliente: nuevoPost.cliente,
-      categoria: 'Posts',
-      estado: 'Parrilla',
-      fecha_entrega: diaSeleccionado.fechaFull,
-      logo_url: nuevoPost.url_diseno, 
-      prioridad: 'Normal'
-    }]);
+    if (idEditando) {
+      // ACTUALIZAR POST EXISTENTE
+      const { error } = await supabase.from('proyectos').update({
+        titulo: nuevoPost.titulo,
+        cliente: nuevoPost.cliente,
+        logo_url: nuevoPost.url_diseno
+      }).eq('id', idEditando);
 
-    if (!error) {
-      setIsModalOpen(false);
-      setNuevoPost({ titulo: '', cliente: '', url_diseno: '' });
-      await fetchPosts();
+      if (error) alert("Error al actualizar: " + error.message);
     } else {
-      alert("Error al guardar post: " + error.message);
+      // INSERTAR NUEVO POST
+      const { error } = await supabase.from('proyectos').insert([{
+        titulo: nuevoPost.titulo,
+        cliente: nuevoPost.cliente,
+        categoria: 'Posts',
+        estado: 'Parrilla',
+        fecha_entrega: diaSeleccionado.fechaFull,
+        logo_url: nuevoPost.url_diseno, 
+        prioridad: 'Normal'
+      }]);
+
+      if (error) alert("Error al guardar: " + error.message);
     }
+
+    setIsModalOpen(false);
+    setIdEditando(null);
+    setNuevoPost({ titulo: '', cliente: '', url_diseno: '' });
+    await fetchPosts();
   };
 
   const deletePost = async (id: string) => {
@@ -220,9 +244,9 @@ export default function PostsPage() {
                   
                   <div className="p-3">
                     <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
-                      <Link href={`/proyecto/${post.id}`} className="p-1.5 bg-black/60 rounded-lg hover:text-purple-400 text-gray-400">
+                      <button onClick={() => abrirEdicion(post)} className="p-1.5 bg-black/60 rounded-lg hover:text-purple-400 text-gray-400">
                         <PencilIcon className="h-3 w-3" />
-                      </Link>
+                      </button>
                       <button onClick={() => deletePost(post.id)} className="p-1.5 bg-black/60 rounded-lg hover:text-red-500 text-gray-400">
                         <TrashIcon className="h-3 w-3" />
                       </button>
@@ -242,7 +266,7 @@ export default function PostsPage() {
                 </div>
               ))}
               <button 
-                onClick={() => { setDiaSeleccionado(dia); setIsModalOpen(true); }} 
+                onClick={() => { setIdEditando(null); setDiaSeleccionado(dia); setIsModalOpen(true); }} 
                 className="mt-auto py-3 border border-dashed border-gray-800/50 rounded-xl text-gray-700 hover:text-purple-400 hover:border-purple-400/30 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <PlusIcon className="h-3 w-3" /> Nuevo Post
@@ -257,9 +281,9 @@ export default function PostsPage() {
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
               <h2 className="text-xs md:text-sm font-bold text-purple-400 uppercase italic">
-                {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia} • Crear Post
+                {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia} • {idEditando ? 'Editar Post' : 'Crear Post'}
               </h2>
-              <button onClick={() => setIsModalOpen(false)} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
+              <button onClick={() => { setIsModalOpen(false); setIdEditando(null); setNuevoPost({ titulo: '', cliente: '', url_diseno: '' }); }} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
             <div className="p-6 md:p-8 space-y-5 pb-10 md:pb-8">
               <div>
@@ -293,7 +317,7 @@ export default function PostsPage() {
               </div>
 
               <button onClick={handlePostRapido} disabled={uploading} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-white disabled:opacity-50">
-                {uploading ? 'GUARDANDO ARCHIVOS...' : 'Confirmar Parrilla'}
+                {uploading ? 'GUARDANDO ARCHIVOS...' : idEditando ? 'Guardar Cambios' : 'Confirmar Parrilla'}
               </button>
             </div>
           </div>
