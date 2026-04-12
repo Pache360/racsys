@@ -13,7 +13,7 @@ import {
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  PaperClipIcon // Nuevo icono para adjuntar
+  PaperClipIcon 
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
@@ -28,7 +28,6 @@ export default function PostsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   
-  // NUEVO: Estado para manejo de archivos
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '' });
   const [uploading, setUploading] = useState(false);
 
@@ -82,32 +81,39 @@ export default function PostsPage() {
     fetchPosts(); 
   }, [fechaBase]);
 
-  // NUEVA FUNCIÓN: Subida de archivo a Storage
+  // FUNCIÓN DE SUBIDA CORREGIDA
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
       
       const file = e.target.files[0];
+      // Generamos un nombre de archivo único para evitar errores de duplicados
       const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
+      const fileName = `${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
       const filePath = `posts/${fileName}`;
 
-      const { error: uploadError } = await supabase.storage
+      // Subida al bucket 'disenos'
+      const { data, error: uploadError } = await supabase.storage
         .from('disenos')
-        .upload(filePath, file);
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
 
       if (uploadError) throw uploadError;
 
+      // Obtención de la URL Pública
       const { data: { publicUrl } } = supabase.storage
         .from('disenos')
         .getPublicUrl(filePath);
 
-      setNuevoPost({ ...nuevoPost, url_diseno: publicUrl });
-      alert("Imagen subida correctamente");
+      setNuevoPost(prev => ({ ...prev, url_diseno: publicUrl }));
+      alert("Diseño cargado con éxito.");
 
     } catch (error: any) {
-      alert("Error subiendo imagen: " + error.message);
+      console.error("Error upload:", error);
+      alert("Error al subir el archivo: " + error.message);
     } finally {
       setUploading(false);
     }
@@ -122,7 +128,7 @@ export default function PostsPage() {
       categoria: 'Posts',
       estado: 'Parrilla',
       fecha_entrega: diaSeleccionado.fechaFull,
-      logo_url: nuevoPost.url_diseno,
+      logo_url: nuevoPost.url_diseno, // Aquí se guarda la URL de la imagen subida
       prioridad: 'Normal'
     }]);
 
@@ -131,7 +137,7 @@ export default function PostsPage() {
       setNuevoPost({ titulo: '', cliente: '', url_diseno: '' });
       await fetchPosts();
     } else {
-      alert("Error: " + error.message);
+      alert("Error al guardar post: " + error.message);
     }
   };
 
@@ -273,23 +279,24 @@ export default function PostsPage() {
                 <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold text-white" />
               </div>
               
-              {/* CAMBIO: Selector de archivo local */}
               <div>
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Subir Diseño</label>
                 <div className="flex gap-2">
                   <label className={`flex-1 flex items-center justify-center gap-2 bg-[#0a0a0a] border border-dashed border-gray-700 rounded-xl p-4 text-[10px] font-bold cursor-pointer hover:border-purple-500 transition-all ${uploading ? 'opacity-50' : ''}`}>
                     <PaperClipIcon className="h-4 w-4 text-purple-500" />
-                    <span className="text-gray-400">{uploading ? 'SUBIENDO...' : nuevoPost.url_diseno ? 'CAMBIAR IMAGEN' : 'SELECCIONAR ARCHIVO'}</span>
+                    <span className="text-gray-400">{uploading ? 'SUBIENDO...' : nuevoPost.url_diseno ? 'IMAGEN LISTA' : 'SELECCIONAR ARCHIVO'}</span>
                     <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} className="hidden" />
                   </label>
                 </div>
                 {nuevoPost.url_diseno && (
-                  <p className="text-[8px] text-green-500 font-bold mt-2 truncate">URL: {nuevoPost.url_diseno}</p>
+                  <div className="mt-2 h-20 w-full rounded-lg overflow-hidden border border-gray-800">
+                     <img src={nuevoPost.url_diseno} className="w-full h-full object-cover" alt="Preview" />
+                  </div>
                 )}
               </div>
 
               <button onClick={handlePostRapido} disabled={uploading} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-white disabled:opacity-50">
-                {uploading ? 'ESPERA...' : 'Confirmar Parrilla'}
+                {uploading ? 'CARGANDO...' : 'Confirmar Parrilla'}
               </button>
             </div>
           </div>
