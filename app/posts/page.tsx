@@ -81,35 +81,30 @@ export default function PostsPage() {
     fetchPosts(); 
   }, [fechaBase]);
 
-  // FUNCIÓN DE SUBIDA CORREGIDA
+  // FUNCIÓN DE SUBIDA ACTIVA
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     try {
       setUploading(true);
       if (!e.target.files || e.target.files.length === 0) return;
       
       const file = e.target.files[0];
-      // Generamos un nombre de archivo único para evitar errores de duplicados
       const fileExt = file.name.split('.').pop();
       const fileName = `${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
       const filePath = `posts/${fileName}`;
 
-      // Subida al bucket 'disenos'
-      const { data, error: uploadError } = await supabase.storage
+      // Subida al bucket 'disenos' ya configurado en tu Supabase
+      const { error: uploadError } = await supabase.storage
         .from('disenos')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
+        .upload(filePath, file);
 
       if (uploadError) throw uploadError;
 
-      // Obtención de la URL Pública
       const { data: { publicUrl } } = supabase.storage
         .from('disenos')
         .getPublicUrl(filePath);
 
       setNuevoPost(prev => ({ ...prev, url_diseno: publicUrl }));
-      alert("Diseño cargado con éxito.");
+      alert("¡Diseño subido con éxito!");
 
     } catch (error: any) {
       console.error("Error upload:", error);
@@ -128,7 +123,7 @@ export default function PostsPage() {
       categoria: 'Posts',
       estado: 'Parrilla',
       fecha_entrega: diaSeleccionado.fechaFull,
-      logo_url: nuevoPost.url_diseno, // Aquí se guarda la URL de la imagen subida
+      logo_url: nuevoPost.url_diseno, 
       prioridad: 'Normal'
     }]);
 
@@ -280,23 +275,25 @@ export default function PostsPage() {
               </div>
               
               <div>
-                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Subir Diseño</label>
-                <div className="flex gap-2">
-                  <label className={`flex-1 flex items-center justify-center gap-2 bg-[#0a0a0a] border border-dashed border-gray-700 rounded-xl p-4 text-[10px] font-bold cursor-pointer hover:border-purple-500 transition-all ${uploading ? 'opacity-50' : ''}`}>
-                    <PaperClipIcon className="h-4 w-4 text-purple-500" />
-                    <span className="text-gray-400">{uploading ? 'SUBIENDO...' : nuevoPost.url_diseno ? 'IMAGEN LISTA' : 'SELECCIONAR ARCHIVO'}</span>
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Cargar Diseño Final</label>
+                <div className="flex flex-col gap-2">
+                  <label className={`flex flex-col items-center justify-center gap-3 bg-[#0a0a0a] border-2 border-dashed border-gray-700 rounded-2xl p-6 text-[10px] font-bold cursor-pointer hover:border-purple-500 transition-all ${uploading ? 'opacity-50' : ''}`}>
+                    <PaperClipIcon className={`h-6 w-6 ${nuevoPost.url_diseno ? 'text-green-500' : 'text-purple-500'}`} />
+                    <span className="text-gray-400 uppercase tracking-widest">
+                        {uploading ? 'SUBIENDO...' : nuevoPost.url_diseno ? 'IMAGEN LISTA ✓' : 'PICAR PARA SUBIR DESDE PC'}
+                    </span>
                     <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} className="hidden" />
                   </label>
                 </div>
                 {nuevoPost.url_diseno && (
-                  <div className="mt-2 h-20 w-full rounded-lg overflow-hidden border border-gray-800">
+                  <div className="mt-2 h-24 w-full rounded-xl overflow-hidden border border-gray-800">
                      <img src={nuevoPost.url_diseno} className="w-full h-full object-cover" alt="Preview" />
                   </div>
                 )}
               </div>
 
               <button onClick={handlePostRapido} disabled={uploading} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-white disabled:opacity-50">
-                {uploading ? 'CARGANDO...' : 'Confirmar Parrilla'}
+                {uploading ? 'GUARDANDO ARCHIVOS...' : 'Confirmar Parrilla'}
               </button>
             </div>
           </div>
