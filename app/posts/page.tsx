@@ -10,7 +10,9 @@ import {
   FunnelIcon,
   XMarkIcon,
   PhotoIcon,
-  PlusIcon
+  PlusIcon,
+  ChevronLeftIcon, // Nuevo icono
+  ChevronRightIcon // Nuevo icono
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
@@ -21,6 +23,8 @@ export default function PostsPage() {
   const [filtroMarca, setFiltroMarca] = useState('');
   const [listaClientes, setListaClientes] = useState<any[]>([]);
   
+  // NUEVO: Estado para controlar la fecha base de la semana
+  const [fechaBase, setFechaBase] = useState(new Date());
   const [diasSemanaActual, setDiasSemanaActual] = useState<{ nombre: string, fechaFull: string, soloDia: number }[]>([]);
 
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -28,13 +32,13 @@ export default function PostsPage() {
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '' });
 
   const generarSemana = () => {
-    const hoy = new Date();
-    const domingoActual = new Date(hoy);
-    domingoActual.setDate(hoy.getDate() - hoy.getDay());
+    // Calculamos el domingo de la semana correspondiente a fechaBase
+    const domingo = new Date(fechaBase);
+    domingo.setDate(fechaBase.getDate() - fechaBase.getDay());
 
     const semana = diasNombres.map((nombre, index) => {
-      const fecha = new Date(domingoActual);
-      fecha.setDate(domingoActual.getDate() + index);
+      const fecha = new Date(domingo);
+      fecha.setDate(domingo.getDate() + index);
       return {
         nombre,
         fechaFull: fecha.toISOString().split('T')[0],
@@ -42,6 +46,19 @@ export default function PostsPage() {
       };
     });
     setDiasSemanaActual(semana);
+  };
+
+  // NUEVO: Funciones para navegar
+  const semanaSiguiente = () => {
+    const nuevaFecha = new Date(fechaBase);
+    nuevaFecha.setDate(fechaBase.getDate() + 7);
+    setFechaBase(nuevaFecha);
+  };
+
+  const semanaAnterior = () => {
+    const nuevaFecha = new Date(fechaBase);
+    nuevaFecha.setDate(fechaBase.getDate() - 7);
+    setFechaBase(nuevaFecha);
   };
 
   const fetchPosts = async () => {
@@ -66,7 +83,7 @@ export default function PostsPage() {
   useEffect(() => { 
     generarSemana();
     fetchPosts(); 
-  }, []);
+  }, [fechaBase]); // Escucha cambios en fechaBase
 
   const handlePostRapido = async () => {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
@@ -134,20 +151,41 @@ export default function PostsPage() {
         </div>
       </div>
 
-      <header className="mb-8 flex items-center gap-4">
-        <div className="bg-purple-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-purple-600/20">
-          <ChatBubbleLeftRightIcon className="h-6 w-6 md:h-7 md:w-7 text-white" />
+      <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex items-center gap-4">
+          <div className="bg-purple-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-purple-600/20">
+            <ChatBubbleLeftRightIcon className="h-6 w-6 md:h-7 md:w-7 text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl md:text-3xl font-bold italic uppercase tracking-tighter leading-none">Calendario Semanal</h1>
+            <p className="text-gray-500 text-[8px] md:text-[10px] tracking-[0.2em] font-black uppercase mt-1">Planificación / PACHE360 STUDIO</p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl md:text-3xl font-bold italic uppercase tracking-tighter leading-none">Calendario Semanal</h1>
-          <p className="text-gray-500 text-[8px] md:text-[10px] tracking-[0.2em] font-black uppercase mt-1">Planificación / PACHE360 STUDIO</p>
+
+        {/* NUEVOS BOTONES DE NAVEGACIÓN */}
+        <div className="flex items-center gap-2 bg-[#111] border border-gray-800 p-1.5 rounded-2xl w-fit">
+          <button 
+            onClick={semanaAnterior}
+            className="p-2 hover:bg-gray-800 rounded-xl transition-colors text-purple-400"
+          >
+            <ChevronLeftIcon className="h-5 w-5" />
+          </button>
+          <span className="text-[9px] font-black uppercase tracking-widest px-2 text-gray-400">
+            Navegar Semanas
+          </span>
+          <button 
+            onClick={semanaSiguiente}
+            className="p-2 hover:bg-gray-800 rounded-xl transition-colors text-purple-400"
+          >
+            <ChevronRightIcon className="h-5 w-5" />
+          </button>
         </div>
       </header>
 
-      {/* CALENDARIO: Scroll horizontal en móvil, Grid 7 en PC */}
+      {/* CALENDARIO */}
       <div className="flex overflow-x-auto pb-6 gap-3 md:grid md:grid-cols-7 md:gap-2 w-full snap-x scrollbar-hide">
         {diasSemanaActual.map((dia) => (
-          <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-3 flex flex-col gap-3 min-w-[260px] md:min-w-0 snap-center">
+          <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-3 flex flex-col gap-3 min-w-65 md:min-w-0 snap-center">
             <div className="text-center border-b border-gray-800/50 pb-2">
                 <h3 className="font-black text-gray-600 uppercase tracking-widest text-[9px]">{dia.nombre}</h3>
                 <span className="text-[16px] font-mono text-purple-500 font-bold">{dia.soloDia}</span>
@@ -163,7 +201,6 @@ export default function PostsPage() {
                   )}
                   
                   <div className="p-3">
-                    {/* ACCIONES SIEMPRE VISIBLES EN MÓVIL */}
                     <div className="absolute top-2 right-2 flex gap-1 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity z-10">
                       <Link href={`/proyecto/${post.id}`} className="p-1.5 bg-black/60 rounded-lg hover:text-purple-400 text-gray-400">
                         <PencilIcon className="h-3 w-3" />
@@ -197,10 +234,10 @@ export default function PostsPage() {
         ))}
       </div>
 
-      {/* MODAL CREAR POST: Estilo Drawer en móvil */}
+      {/* MODAL CREAR POST */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-[2rem] md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
+          <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
               <h2 className="text-xs md:text-sm font-bold text-purple-400 uppercase italic">
                 {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia} • Crear Post
