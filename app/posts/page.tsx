@@ -11,8 +11,9 @@ import {
   XMarkIcon,
   PhotoIcon,
   PlusIcon,
-  ChevronLeftIcon, // Nuevo icono
-  ChevronRightIcon // Nuevo icono
+  ChevronLeftIcon,
+  ChevronRightIcon,
+  PaperClipIcon // Nuevo icono para adjuntar
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
@@ -22,20 +23,18 @@ export default function PostsPage() {
   const [posts, setPosts] = useState<any[]>([]);
   const [filtroMarca, setFiltroMarca] = useState('');
   const [listaClientes, setListaClientes] = useState<any[]>([]);
-  
-  // NUEVO: Estado para controlar la fecha base de la semana
   const [fechaBase, setFechaBase] = useState(new Date());
   const [diasSemanaActual, setDiasSemanaActual] = useState<{ nombre: string, fechaFull: string, soloDia: number }[]>([]);
-
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
+  
+  // NUEVO: Estado para manejo de archivos
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '' });
+  const [uploading, setUploading] = useState(false);
 
   const generarSemana = () => {
-    // Calculamos el domingo de la semana correspondiente a fechaBase
     const domingo = new Date(fechaBase);
     domingo.setDate(fechaBase.getDate() - fechaBase.getDay());
-
     const semana = diasNombres.map((nombre, index) => {
       const fecha = new Date(domingo);
       fecha.setDate(domingo.getDate() + index);
@@ -48,7 +47,6 @@ export default function PostsPage() {
     setDiasSemanaActual(semana);
   };
 
-  // NUEVO: Funciones para navegar
   const semanaSiguiente = () => {
     const nuevaFecha = new Date(fechaBase);
     nuevaFecha.setDate(fechaBase.getDate() + 7);
@@ -64,7 +62,6 @@ export default function PostsPage() {
   const fetchPosts = async () => {
     const { data } = await supabase.from('proyectos').select('*').eq('categoria', 'Posts');
     const { data: clientes } = await supabase.from('clientes').select('nombre');
-    
     if (clientes) setListaClientes(clientes);
     if (data) {
       const formateados = data.map(p => ({
@@ -83,7 +80,38 @@ export default function PostsPage() {
   useEffect(() => { 
     generarSemana();
     fetchPosts(); 
-  }, [fechaBase]); // Escucha cambios en fechaBase
+  }, [fechaBase]);
+
+  // NUEVA FUNCIÓN: Subida de archivo a Storage
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    try {
+      setUploading(true);
+      if (!e.target.files || e.target.files.length === 0) return;
+      
+      const file = e.target.files[0];
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `posts/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('disenos')
+        .upload(filePath, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('disenos')
+        .getPublicUrl(filePath);
+
+      setNuevoPost({ ...nuevoPost, url_diseno: publicUrl });
+      alert("Imagen subida correctamente");
+
+    } catch (error: any) {
+      alert("Error subiendo imagen: " + error.message);
+    } finally {
+      setUploading(false);
+    }
+  };
 
   const handlePostRapido = async () => {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
@@ -134,7 +162,6 @@ export default function PostsPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4">
-      {/* NAVEGACIÓN Y FILTRO */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-[10px] font-bold uppercase tracking-widest">
           <ArrowLeftIcon className="h-3 w-3" /> Volver al Dashboard
@@ -162,27 +189,17 @@ export default function PostsPage() {
           </div>
         </div>
 
-        {/* NUEVOS BOTONES DE NAVEGACIÓN */}
         <div className="flex items-center gap-2 bg-[#111] border border-gray-800 p-1.5 rounded-2xl w-fit">
-          <button 
-            onClick={semanaAnterior}
-            className="p-2 hover:bg-gray-800 rounded-xl transition-colors text-purple-400"
-          >
+          <button onClick={semanaAnterior} className="p-2 hover:bg-gray-800 rounded-xl transition-colors text-purple-400">
             <ChevronLeftIcon className="h-5 w-5" />
           </button>
-          <span className="text-[9px] font-black uppercase tracking-widest px-2 text-gray-400">
-            Navegar Semanas
-          </span>
-          <button 
-            onClick={semanaSiguiente}
-            className="p-2 hover:bg-gray-800 rounded-xl transition-colors text-purple-400"
-          >
+          <span className="text-[9px] font-black uppercase tracking-widest px-2 text-gray-400">Navegar Semanas</span>
+          <button onClick={semanaSiguiente} className="p-2 hover:bg-gray-800 rounded-xl transition-colors text-purple-400">
             <ChevronRightIcon className="h-5 w-5" />
           </button>
         </div>
       </header>
 
-      {/* CALENDARIO */}
       <div className="flex overflow-x-auto pb-6 gap-3 md:grid md:grid-cols-7 md:gap-2 w-full snap-x scrollbar-hide">
         {diasSemanaActual.map((dia) => (
           <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-3 flex flex-col gap-3 min-w-65 md:min-w-0 snap-center">
@@ -234,7 +251,6 @@ export default function PostsPage() {
         ))}
       </div>
 
-      {/* MODAL CREAR POST */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
@@ -256,12 +272,24 @@ export default function PostsPage() {
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Título del Post</label>
                 <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold text-white" />
               </div>
+              
+              {/* CAMBIO: Selector de archivo local */}
               <div>
-                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">URL de la Imagen (Opcional)</label>
-                <input type="text" value={nuevoPost.url_diseno} onChange={e => setNuevoPost({...nuevoPost, url_diseno: e.target.value})} placeholder="https://..." className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-mono text-white" />
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Subir Diseño</label>
+                <div className="flex gap-2">
+                  <label className={`flex-1 flex items-center justify-center gap-2 bg-[#0a0a0a] border border-dashed border-gray-700 rounded-xl p-4 text-[10px] font-bold cursor-pointer hover:border-purple-500 transition-all ${uploading ? 'opacity-50' : ''}`}>
+                    <PaperClipIcon className="h-4 w-4 text-purple-500" />
+                    <span className="text-gray-400">{uploading ? 'SUBIENDO...' : nuevoPost.url_diseno ? 'CAMBIAR IMAGEN' : 'SELECCIONAR ARCHIVO'}</span>
+                    <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} className="hidden" />
+                  </label>
+                </div>
+                {nuevoPost.url_diseno && (
+                  <p className="text-[8px] text-green-500 font-bold mt-2 truncate">URL: {nuevoPost.url_diseno}</p>
+                )}
               </div>
-              <button onClick={handlePostRapido} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-white">
-                Confirmar Parrilla
+
+              <button onClick={handlePostRapido} disabled={uploading} className="w-full bg-purple-600 hover:bg-purple-500 py-4 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] transition-all shadow-lg shadow-purple-600/20 active:scale-95 text-white disabled:opacity-50">
+                {uploading ? 'ESPERA...' : 'Confirmar Parrilla'}
               </button>
             </div>
           </div>
