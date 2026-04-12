@@ -1,19 +1,29 @@
 'use client';
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import { useRouter } from 'next/navigation'; // Importamos useRouter para redirigir
 import { supabase } from '@/lib/supabase';
 import { 
   CameraIcon, VideoCameraIcon, PlusIcon, PlayIcon, 
   ChatBubbleLeftRightIcon, CalendarIcon, XMarkIcon,
-  UserGroupIcon, ArrowRightOnRectangleIcon 
+  UserGroupIcon, ArrowRightOnRectangleIcon // Importamos icono de salida
 } from '@heroicons/react/24/outline';
 
+// --- NUEVA: Definición de Estados por Categoría ---
+const ESTADOS_PROYECTO = {
+  Fotografía: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Entrega', 'Finalizado'],
+  Video: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Entrega', 'Finalizado'],
+  Posts: ['Parrilla', 'Diseño', 'Cambios', 'Publicado', 'Programado']
+};
+
 export default function Home() {
-  const router = useRouter();
+  const router = useRouter(); // Inicializamos el router
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [categoria, setCategoria] = useState('Fotografía');
+  const [categoria, setCategoria] = useState<keyof typeof ESTADOS_PROYECTO>('Fotografía'); // Tipado de categoría
   const [loading, setLoading] = useState(false);
+
+  // --- NUEVO: Estado para el estado del proyecto ---
+  const [estadoProyecto, setEstadoProyecto] = useState<string>(''); 
 
   const [proyectosDB, setProyectosDB] = useState<any[]>([]);
   const [listaClientesDB, setListaClientesDB] = useState<any[]>([]); 
@@ -34,12 +44,15 @@ export default function Home() {
     nuevoClienteLogo: ''
   });
 
+  // FUNCIÓN PARA CERRAR SESIÓN (NUEVA)
   const handleLogout = () => {
+    // Borramos la cookie de autenticación expirándola inmediatamente
     document.cookie = "pache_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict";
-    router.push('/login');
+    router.push('/login'); // Mandamos al usuario al login
   };
 
   const fetchDatos = async () => {
+    // Traemos proyectos y clientes (dueños y marcas)
     const { data: proyData } = await supabase
       .from('proyectos')
       .select('*')
@@ -47,16 +60,16 @@ export default function Home() {
 
     const { data: clientData } = await supabase
       .from('clientes')
-      .select('*')
+      .select('*') // Traemos todo para filtrar marcas de dueños
       .order('nombre', { ascending: true });
 
     if (proyData && clientData) {
-      // Identificamos las marcas (los que tienen dueno_id)
+      // Identificamos quiénes son marcas (los que tienen dueno_id)
       const nombresMarcas = clientData
         .filter(c => c.dueno_id && c.dueno_id !== '')
         .map(c => c.nombre);
 
-      // Filtramos proyectos para el Dashboard (solo marcas)
+      // Filtramos proyectos para que en el Dashboard solo cuenten y se vean los de MARCAS
       const proyectosSoloMarcas = proyData.filter(p => nombresMarcas.includes(p.cliente));
 
       const formateados = proyectosSoloMarcas.map(p => ({
@@ -75,7 +88,9 @@ export default function Home() {
         youtube: 0, 
         posts: proyectosSoloMarcas.filter(p => p.categoria === 'Posts').length,
       });
+    }
 
+    if (clientData) {
       // --- CAMBIO AQUÍ ---
       // Filtramos la lista para el SELECTOR del modal: Solo mostramos registros que son MARCAS
       const soloMarcasParaSelector = clientData.filter(c => c.dueno_id && c.dueno_id !== '');
@@ -86,6 +101,14 @@ export default function Home() {
   useEffect(() => {
     fetchDatos();
   }, []);
+
+  // --- NUEVO: Efecto para cambiar el estado automáticamente al cambiar de categoría ---
+  useEffect(() => {
+    if (isModalOpen) {
+      // Pre-seleccionamos el primer estado de la nueva categoría
+      setEstadoProyecto(ESTADOS_PROYECTO[categoria][0]);
+    }
+  }, [categoria, isModalOpen]);
 
   const getPrioridadColor = (prio: string) => {
     switch (prio) {
@@ -122,7 +145,8 @@ export default function Home() {
         fecha_tomas: formData.fecha_tomas || null,
         ubicacion: formData.ubicacion,
         prioridad: formData.prioridad,
-        estado: 'Cotización'
+        // --- CAMBIO AQUÍ: Guardamos el estado seleccionado ---
+        estado: estadoProyecto
       }
     ]);
 
@@ -148,6 +172,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8 relative">
+      
+      {/* HEADER RESPONSIVO: Se apila en móvil, se expande en PC */}
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 md:mb-12 border-b border-purple-900/30 pb-6 gap-6 md:gap-0">
         <div className="text-center md:text-left">
           <h1 className="text-4xl font-extrabold tracking-tight italic">PACHE<span className="text-purple-500">360</span></h1>
@@ -155,6 +181,7 @@ export default function Home() {
         </div>
         
         <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
+          {/* BOTÓN CERRAR SESIÓN (NUEVO) */}
           <button 
             onClick={handleLogout}
             className="flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-500/30 px-4 py-3 rounded-xl font-bold transition-all active:scale-95 text-xs uppercase w-full sm:w-auto"
@@ -178,6 +205,7 @@ export default function Home() {
         </div>
       </header>
 
+      {/* SECCIONES PRINCIPALES: Solo cuentan proyectos de MARCAS */}
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
         <Link href="/fotos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <CameraIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
@@ -201,6 +229,7 @@ export default function Home() {
         </Link>
       </section>
       
+      {/* PRÓXIMAS ENTREGAS: Solo visualiza MARCAS */}
       <div className="bg-[#111] border border-gray-800 rounded-3xl p-4 md:p-8 shadow-2xl">
         <div className="flex items-center gap-2 mb-6 italic">
           <CalendarIcon className="h-6 w-6 text-purple-500" />
@@ -227,9 +256,10 @@ export default function Home() {
         </div>
       </div>
 
+      {/* MODAL NUEVO PROYECTO */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
-          <div className="bg-[#111] border border-purple-500/30 w-full max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+        <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
+          <div className="bg-[#111] border border-purple-500/30 w-full max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border-t-4 border-t-purple-500">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
               <h2 className="text-lg md:text-xl font-bold text-purple-400 uppercase italic">Nuevo Proyecto</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white p-2">
@@ -238,21 +268,23 @@ export default function Home() {
             </div>
 
             <form className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-y-auto">
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Título del Proyecto</label>
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Título del Proyecto</label>
                 <input 
+                  required
                   value={formData.titulo}
                   onChange={(e) => setFormData({...formData, titulo: e.target.value})}
-                  type="text" placeholder="Ej: Sesión Gastronómica Mayo" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none transition-all text-sm" 
+                  type="text" placeholder="Ej: Sesión Gastronómica Mayo" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none transition-all text-sm font-bold text-white" 
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Asignar a Marca</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Marca Asignada</label>
                 <select 
+                  required
                   value={formData.cliente}
                   onChange={(e) => setFormData({...formData, cliente: e.target.value})}
-                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm"
+                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm font-bold text-white"
                   disabled={formData.prioridad === 'Cliente Nuevo'}
                 >
                   <option value="">Seleccionar Marca...</option>
@@ -260,21 +292,37 @@ export default function Home() {
                 </select>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Categoría</label>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Categoría</label>
                 <select 
+                  required
                   value={categoria}
-                  onChange={(e) => setCategoria(e.target.value)}
-                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm"
+                  onChange={(e) => setCategoria(e.target.value as keyof typeof ESTADOS_PROYECTO)}
+                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm font-bold text-white"
                 >
-                  <option value="Fotografía">Fotografía</option>
-                  <option value="Video">Video</option>
-                  <option value="Posts">Posts</option>
+                  {Object.keys(ESTADOS_PROYECTO).map(cat => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))}
                 </select>
               </div>
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Prioridad</label>
+              {/* --- NUEVO: Selector de Estado Dinámico --- */}
+              <div className="md:col-span-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
+                <label className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Estado de Producción ({categoria})</label>
+                <select 
+                  required
+                  value={estadoProyecto}
+                  onChange={(e) => setEstadoProyecto(e.target.value)}
+                  className="w-full bg-[#0a0a0a] border border-purple-900 rounded-xl p-3 focus:border-purple-500 outline-none text-sm font-bold text-white"
+                >
+                  {ESTADOS_PROYECTO[categoria].map(est => (
+                    <option key={est} value={est}>{est}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Prioridad</label>
                 <div className="grid grid-cols-3 gap-2 md:gap-4">
                   {['Alta', 'Normal', 'Cliente Nuevo'].map((prio) => (
                     <button
@@ -299,34 +347,34 @@ export default function Home() {
                 </div>
               )}
 
-              <div className="md:col-span-2">
-                <label className="block text-xs font-bold text-gray-500 uppercase mb-2">Descripción</label>
+              <div className="md:col-span-2 space-y-1">
+                <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Descripción</label>
                 <textarea 
                   value={formData.descripcion}
                   onChange={(e) => setFormData({...formData, descripcion: e.target.value})}
-                  rows={2} className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm" placeholder="Brief..."
+                  rows={2} className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm text-white font-medium" placeholder="Brief..."
                 ></textarea>
               </div>
 
               <div className="md:col-span-2 bg-[#0a0a0a] p-4 rounded-2xl border border-gray-800">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Entrega</label>
+                    <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider">Fecha Entrega</label>
                     <input 
                       type="date" 
                       value={formData.fecha_entrega} 
                       onChange={(e) => setFormData({...formData, fecha_entrega: e.target.value})} 
-                      className="w-full bg-[#111] border border-gray-800 rounded-lg p-2 outline-none text-sm text-white" 
+                      className="w-full bg-[#111] border border-gray-800 rounded-lg p-2 outline-none text-sm text-white font-mono" 
                     />
                   </div>
                   {(categoria !== 'Posts') && (
                     <div>
-                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1">Fecha Tomas</label>
+                      <label className="block text-[10px] font-bold text-gray-500 uppercase mb-1 tracking-wider">Fecha Tomas</label>
                       <input 
                         type="date" 
                         value={formData.fecha_tomas} 
                         onChange={(e) => setFormData({...formData, fecha_tomas: e.target.value})} 
-                        className="w-full bg-[#111] border border-gray-800 rounded-lg p-2 outline-none text-sm text-white" 
+                        className="w-full bg-[#111] border border-gray-800 rounded-lg p-2 outline-none text-sm text-white font-mono" 
                       />
                     </div>
                   )}
@@ -334,7 +382,7 @@ export default function Home() {
               </div>
 
               <div className="md:col-span-2 pt-4 pb-8 md:pb-0">
-                <button type="button" onClick={handleSave} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest disabled:opacity-50 text-sm">
+                <button type="button" onClick={handleSave} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest disabled:opacity-50 text-sm active:scale-95">
                   {loading ? 'Guardando...' : 'Crear Proyecto'}
                 </button>
               </div>
