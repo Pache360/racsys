@@ -7,7 +7,8 @@ import {
   CameraIcon, 
   PencilIcon, 
   TrashIcon,
-  FunnelIcon 
+  FunnelIcon,
+  CalendarIcon // Nuevo icono para entrega
 } from '@heroicons/react/24/outline';
 
 export default function FotosPage() {
@@ -17,6 +18,7 @@ export default function FotosPage() {
   const listaEstados = ['Cotización', 'Autorización', 'Planeación', 'Agendado', 'Fotos crudas', 'RAW Revelado', 'Entregado'];
 
   const fetchFotos = async () => {
+    // CAMBIO: Aseguramos traer fecha_tomas y fecha_entrega
     const { data: proyectos, error: errorP } = await supabase
       .from('proyectos')
       .select('*')
@@ -35,7 +37,10 @@ export default function FotosPage() {
           cliente: p.cliente,
           imagen: clienteInfo?.logo_url || "https://images.unsplash.com/photo-1542038784456-1ea8e935640e?q=80&w=1000", 
           estado: p.estado || "Cotización",
-          prioridad: p.prioridad || "Normal"
+          prioridad: p.prioridad || "Normal",
+          // CAMBIO: Mapeamos las nuevas fechas
+          fecha_tomas: p.fecha_tomas,
+          fecha_entrega: p.fecha_entrega
         };
       });
       setProyectosFoto(formateados);
@@ -122,12 +127,12 @@ export default function FotosPage() {
         </div>
       </header>
 
-      {/* Grid de Proyectos: 1 col móvil, 2 tablet, 3 PC */}
+      {/* Grid de Proyectos */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 md:gap-8">
         {proyectosFiltrados.map((proy) => (
           <div key={proy.id} className="bg-[#111] rounded-3xl overflow-hidden border border-gray-800 hover:border-purple-500/50 transition-all group relative shadow-2xl">
             
-            {/* MENÚ DE ACCIONES: Siempre visible en móvil para usabilidad */}
+            {/* MENÚ DE ACCIONES */}
             <div className="absolute top-4 left-4 z-20 flex gap-2 opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity">
               <Link href={`/proyecto/${proy.id}`} className="bg-black/60 backdrop-blur-md p-2 rounded-xl border border-white/10 hover:text-purple-400 transition-colors">
                 <PencilIcon className="h-4 w-4" />
@@ -155,11 +160,30 @@ export default function FotosPage() {
 
             <div className="p-5 md:p-6">
               <h3 className="text-lg md:text-xl font-bold mb-1 text-purple-100 group-hover:text-purple-400 transition-colors uppercase italic truncate">{proy.titulo}</h3>
-              <p className="text-gray-500 text-xs md:text-sm mb-6 italic">Cliente: {proy.cliente}</p>
+              <p className="text-gray-500 text-xs md:text-sm mb-4 italic">Cliente: {proy.cliente}</p>
+              
+              {/* --- CAMBIO: BLOQUE DE FECHAS --- */}
+              <div className="grid grid-cols-2 gap-3 mb-6 pt-4 border-t border-gray-800/50">
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-purple-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                    <CameraIcon className="h-3 w-3" /> Producción
+                  </span>
+                  <span className="text-[9px] md:text-[10px] font-mono text-gray-300 bg-black/40 px-2 py-1 rounded-md border border-gray-800 text-center">
+                    {proy.fecha_tomas ? proy.fecha_tomas : 'PENDIENTE'}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                    <CalendarIcon className="h-3 w-3" /> Entrega
+                  </span>
+                  <span className="text-[9px] md:text-[10px] font-mono text-gray-300 bg-black/40 px-2 py-1 rounded-md border border-gray-800 text-center">
+                    {proy.fecha_entrega ? proy.fecha_entrega : 'SIN FECHA'}
+                  </span>
+                </div>
+              </div>
               
               <div className="flex flex-col gap-3">
                 <span className="text-[9px] md:text-[10px] uppercase text-gray-500 font-bold tracking-widest">Estado Actual</span>
-                
                 <select 
                   value={proy.estado}
                   onChange={(e) => updateEstado(proy.id, e.target.value)}

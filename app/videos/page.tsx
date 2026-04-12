@@ -8,7 +8,8 @@ import {
   PlayIcon,
   PencilIcon,
   TrashIcon,
-  FunnelIcon 
+  FunnelIcon,
+  CalendarIcon // Nuevo icono para entrega
 } from '@heroicons/react/24/outline';
 
 export default function VideosPage() {
@@ -32,6 +33,7 @@ export default function VideosPage() {
   };
 
   const fetchVideos = async () => {
+    // CAMBIO: Aseguramos traer todos los campos, incluyendo fechas
     const { data, error } = await supabase
       .from('proyectos')
       .select('*')
@@ -45,7 +47,10 @@ export default function VideosPage() {
         cliente: p.cliente,
         videoUrl: formatVideoUrl(p.logo_url || p.descripcion), 
         estado: p.estado || "Cotización",
-        prioridad: p.prioridad || "Normal"
+        prioridad: p.prioridad || "Normal",
+        // CAMBIO: Mapeamos las nuevas fechas
+        fecha_tomas: p.fecha_tomas,
+        fecha_entrega: p.fecha_entrega
       }));
       setProyectosVideo(formateados);
     }
@@ -132,7 +137,7 @@ export default function VideosPage() {
         </div>
       </header>
 
-      {/* GRID DE VIDEOS: 1 columna en móvil, 2 en pantallas grandes */}
+      {/* GRID DE VIDEOS */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 md:gap-8">
         {proyectosFiltrados.map((proy) => (
           <div key={proy.id} className="bg-[#111] rounded-3xl overflow-hidden border border-gray-800 hover:border-purple-500/50 transition-all group relative shadow-2xl">
@@ -171,8 +176,28 @@ export default function VideosPage() {
             <div className="p-5 md:p-6">
               <div className="flex justify-between items-start mb-4">
                 <div>
-                  <h3 className="text-lg md:text-xl font-bold mb-1 text-purple-100 uppercase italic group-hover:text-purple-400 transition-colors truncate max-w-[250px] md:max-w-none">{proy.titulo}</h3>
+                  <h3 className="text-lg md:text-xl font-bold mb-1 text-purple-100 uppercase italic group-hover:text-purple-400 transition-colors truncate max-w-62.5 md:max-w-none">{proy.titulo}</h3>
                   <p className="text-gray-500 text-xs md:text-sm italic font-medium uppercase">Cliente: {proy.cliente}</p>
+                </div>
+              </div>
+
+              {/* --- CAMBIO: BLOQUE DE FECHAS --- */}
+              <div className="grid grid-cols-2 gap-3 mb-6 pt-4 border-t border-gray-800/50">
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-purple-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                    <VideoCameraIcon className="h-3 w-3" /> Producción
+                  </span>
+                  <span className="text-[9px] md:text-[10px] font-mono text-gray-300 bg-black/40 px-2 py-1 rounded-md border border-gray-800 text-center">
+                    {proy.fecha_tomas ? proy.fecha_tomas : 'PENDIENTE'}
+                  </span>
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[8px] font-black text-cyan-500 uppercase tracking-widest mb-1 flex items-center gap-1">
+                    <CalendarIcon className="h-3 w-3" /> Entrega
+                  </span>
+                  <span className="text-[9px] md:text-[10px] font-mono text-gray-300 bg-black/40 px-2 py-1 rounded-md border border-gray-800 text-center">
+                    {proy.fecha_entrega ? proy.fecha_entrega : 'SIN FECHA'}
+                  </span>
                 </div>
               </div>
               
