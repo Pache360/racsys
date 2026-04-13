@@ -28,9 +28,9 @@ export default function PostsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   
-  const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '' });
+  // ACTUALIZADO: Agregamos 'descripcion' al estado inicial
+  const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '', descripcion: '' });
   const [uploading, setUploading] = useState(false);
-  // NUEVO: Estado para saber si estamos editando
   const [idEditando, setIdEditando] = useState<string | null>(null);
 
   const generarSemana = () => {
@@ -72,7 +72,8 @@ export default function PostsPage() {
         fecha_entrega: p.fecha_entrega,
         estado: p.estado || 'Parrilla',
         prioridad: p.prioridad || 'Normal',
-        imagen: p.logo_url 
+        imagen: p.logo_url,
+        descripcion: p.descripcion || '' // Recuperamos la descripción
       }));
       setPosts(formateados);
     }
@@ -83,14 +84,15 @@ export default function PostsPage() {
     fetchPosts(); 
   }, [fechaBase]);
 
-  // FUNCIÓN PARA CARGAR DATOS EN EL MODAL PARA EDITAR
+  // ACTUALIZADO: Cargamos la descripción al editar
   const abrirEdicion = (post: any) => {
     const dia = diasSemanaActual.find(d => d.fechaFull === post.fecha_entrega) || null;
     setDiaSeleccionado(dia);
     setNuevoPost({
       titulo: post.titulo,
       cliente: post.cliente,
-      url_diseno: post.imagen || ''
+      url_diseno: post.imagen || '',
+      descripcion: post.descripcion || ''
     });
     setIdEditando(post.id);
     setIsModalOpen(true);
@@ -131,23 +133,25 @@ export default function PostsPage() {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
     
     if (idEditando) {
-      // ACTUALIZAR POST EXISTENTE
+      // ACTUALIZAR POST EXISTENTE (Incluyendo descripción)
       const { error } = await supabase.from('proyectos').update({
         titulo: nuevoPost.titulo,
         cliente: nuevoPost.cliente,
-        logo_url: nuevoPost.url_diseno
+        logo_url: nuevoPost.url_diseno,
+        descripcion: nuevoPost.descripcion
       }).eq('id', idEditando);
 
       if (error) alert("Error al actualizar: " + error.message);
     } else {
-      // INSERTAR NUEVO POST
+      // INSERTAR NUEVO POST (Incluyendo descripción)
       const { error } = await supabase.from('proyectos').insert([{
         titulo: nuevoPost.titulo,
         cliente: nuevoPost.cliente,
         categoria: 'Posts',
         estado: 'Parrilla',
         fecha_entrega: diaSeleccionado.fechaFull,
-        logo_url: nuevoPost.url_diseno, 
+        logo_url: nuevoPost.url_diseno,
+        descripcion: nuevoPost.descripcion,
         prioridad: 'Normal'
       }]);
 
@@ -156,7 +160,7 @@ export default function PostsPage() {
 
     setIsModalOpen(false);
     setIdEditando(null);
-    setNuevoPost({ titulo: '', cliente: '', url_diseno: '' });
+    setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '' });
     await fetchPosts();
   };
 
@@ -187,6 +191,7 @@ export default function PostsPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4">
+      {/* HEADER Y NAVEGACIÓN (Sin cambios) */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-[10px] font-bold uppercase tracking-widest">
           <ArrowLeftIcon className="h-3 w-3" /> Volver al Dashboard
@@ -225,6 +230,7 @@ export default function PostsPage() {
         </div>
       </header>
 
+      {/* CALENDARIO (Sin cambios) */}
       <div className="flex overflow-x-auto pb-6 gap-3 md:grid md:grid-cols-7 md:gap-2 w-full snap-x scrollbar-hide">
         {diasSemanaActual.map((dia) => (
           <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-3 flex flex-col gap-3 min-w-65 md:min-w-0 snap-center">
@@ -266,7 +272,7 @@ export default function PostsPage() {
                 </div>
               ))}
               <button 
-                onClick={() => { setIdEditando(null); setDiaSeleccionado(dia); setIsModalOpen(true); }} 
+                onClick={() => { setIdEditando(null); setDiaSeleccionado(dia); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '' }); setIsModalOpen(true); }} 
                 className="mt-auto py-3 border border-dashed border-gray-800/50 rounded-xl text-gray-700 hover:text-purple-400 hover:border-purple-400/30 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <PlusIcon className="h-3 w-3" /> Nuevo Post
@@ -276,6 +282,7 @@ export default function PostsPage() {
         ))}
       </div>
 
+      {/* MODAL ACTUALIZADO: Incluye Descripción / Notas */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
@@ -283,7 +290,7 @@ export default function PostsPage() {
               <h2 className="text-xs md:text-sm font-bold text-purple-400 uppercase italic">
                 {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia} • {idEditando ? 'Editar Post' : 'Crear Post'}
               </h2>
-              <button onClick={() => { setIsModalOpen(false); setIdEditando(null); setNuevoPost({ titulo: '', cliente: '', url_diseno: '' }); }} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
+              <button onClick={() => { setIsModalOpen(false); setIdEditando(null); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '' }); }} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
             <div className="p-6 md:p-8 space-y-5 pb-10 md:pb-8">
               <div>
@@ -296,6 +303,17 @@ export default function PostsPage() {
               <div>
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Título del Post</label>
                 <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold text-white" />
+              </div>
+
+              {/* NUEVO: Campo de Descripción / Notas */}
+              <div>
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Descripción / Notas</label>
+                <textarea 
+                  value={nuevoPost.descripcion} 
+                  onChange={e => setNuevoPost({...nuevoPost, descripcion: e.target.value})} 
+                  placeholder="Copy del post o notas internas..." 
+                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-medium text-white min-h-[80px]"
+                />
               </div>
               
               <div>
