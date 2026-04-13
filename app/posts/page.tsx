@@ -13,12 +13,12 @@ import {
   PlusIcon,
   ChevronLeftIcon,
   ChevronRightIcon,
-  PaperClipIcon 
+  PaperClipIcon,
+  ChatBubbleLeftEllipsisIcon // NUEVO ICONO
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
   const diasNombres = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-  // ACTUALIZADO: Se añade 'Autorizado' a la lista de estados
   const estados = ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Programado', 'Publicado'];
 
   const [posts, setPosts] = useState<any[]>([]);
@@ -173,7 +173,6 @@ export default function PostsPage() {
     fetchPosts();
   };
 
-  // ACTUALIZADO: Se añade el color cian para el estado "Autorizado"
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'Parrilla': return 'bg-gray-800 text-gray-400 border-gray-700';
@@ -258,13 +257,25 @@ export default function PostsPage() {
                     <h4 className="text-[10px] font-bold text-purple-100 mb-1 leading-tight uppercase italic pr-8">{post.titulo}</h4>
                     <p className="text-[8px] text-gray-500 font-bold uppercase mb-3">{post.cliente}</p>
                     
-                    <select 
-                      value={post.estado} 
-                      className={`w-full text-[8px] font-black py-2 rounded-lg border border-opacity-20 outline-none appearance-none text-center cursor-pointer ${getEstadoColor(post.estado)}`} 
-                      onChange={(e) => updateEstado(post.id, e.target.value)}
-                    >
-                      {estados.map(est => <option key={est} value={est} className="bg-[#0a0a0a]">{est}</option>)}
-                    </select>
+                    <div className="space-y-2">
+                      {/* BOTÓN "VER CAMBIOS" - SOLO SI EL ESTADO ES 'Cambios' */}
+                      {post.estado === 'Cambios' && (
+                        <button 
+                          onClick={() => abrirEdicion(post)}
+                          className="w-full flex items-center justify-center gap-1 bg-orange-500/20 border border-orange-500/50 py-2 rounded-lg text-orange-400 text-[8px] font-black uppercase animate-pulse"
+                        >
+                          <ChatBubbleLeftEllipsisIcon className="h-3 w-3" /> Ver Ajustes
+                        </button>
+                      )}
+
+                      <select 
+                        value={post.estado} 
+                        className={`w-full text-[8px] font-black py-2 rounded-lg border border-opacity-20 outline-none appearance-none text-center cursor-pointer ${getEstadoColor(post.estado)}`} 
+                        onChange={(e) => updateEstado(post.id, e.target.value)}
+                      >
+                        {estados.map(est => <option key={est} value={est} className="bg-[#0a0a0a]">{est}</option>)}
+                      </select>
+                    </div>
                   </div>
                 </div>
               ))}
