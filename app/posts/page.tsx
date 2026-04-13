@@ -19,7 +19,8 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
-  const diasNombres = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
+  // ACTUALIZADO: El orden ahora empieza en Lunes
+  const diasNombres = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
   const estados = ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Programado', 'Publicado'];
 
   const [posts, setPosts] = useState<any[]>([]);
@@ -30,21 +31,33 @@ export default function PostsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   
-  // ACTUALIZADO: Agregamos notas_cliente al estado inicial
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' });
   const [uploading, setUploading] = useState(false);
   const [idEditando, setIdEditando] = useState<string | null>(null);
 
+  // ACTUALIZADO: Lógica para que la semana inicie en Lunes y evitar desfase de fechas
   const generarSemana = () => {
-    const domingo = new Date(fechaBase);
-    domingo.setDate(fechaBase.getDate() - fechaBase.getDay());
+    const fecha = new Date(fechaBase);
+    // Obtener el día de la semana (0=Dom, 1=Lun...)
+    const day = fecha.getDay();
+    // Ajustar para que el Lunes sea el primer día (si es domingo, retrocedemos 6 días)
+    const diff = fecha.getDate() - day + (day === 0 ? -6 : 1);
+    const lunes = new Date(fecha.setDate(diff));
+
     const semana = diasNombres.map((nombre, index) => {
-      const fecha = new Date(domingo);
-      fecha.setDate(domingo.getDate() + index);
+      const d = new Date(lunes);
+      d.setDate(lunes.getDate() + index);
+      
+      // Formatear manualmente YYYY-MM-DD para evitar errores de zona horaria (UTC vs Local)
+      const anio = d.getFullYear();
+      const mes = String(d.getMonth() + 1).padStart(2, '0');
+      const dia = String(d.getDate()).padStart(2, '0');
+      const fechaFormateada = `${anio}-${mes}-${dia}`;
+
       return {
         nombre,
-        fechaFull: fecha.toISOString().split('T')[0],
-        soloDia: fecha.getDate()
+        fechaFull: fechaFormateada,
+        soloDia: d.getDate()
       };
     });
     setDiasSemanaActual(semana);
@@ -76,7 +89,7 @@ export default function PostsPage() {
         prioridad: p.prioridad || 'Normal',
         imagen: p.logo_url,
         descripcion: p.descripcion || '',
-        notas_cliente: p.notas_cliente || '' // <--- CONECTADO A SUPABASE
+        notas_cliente: p.notas_cliente || '' 
       }));
       setPosts(formateados);
     }
@@ -95,13 +108,12 @@ export default function PostsPage() {
       cliente: post.cliente,
       url_diseno: post.imagen || '',
       descripcion: post.descripcion || '',
-      notas_cliente: post.notas_cliente || '' // <--- CARGAMOS LA NOTA
+      notas_cliente: post.notas_cliente || '' 
     });
     setIdEditando(post.id);
     setIsModalOpen(true);
   };
 
-  // Función para limpiar cambios y regresar a diseño
   const resolverCambios = async (id: string) => {
     const { error } = await supabase
       .from('proyectos')
@@ -149,7 +161,6 @@ export default function PostsPage() {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
     
     if (idEditando) {
-      // ACTUALIZADO: Aquí ya no enviamos notas_cliente para que no se borre al editar
       const { error } = await supabase.from('proyectos').update({
         titulo: nuevoPost.titulo,
         cliente: nuevoPost.cliente,
@@ -168,7 +179,7 @@ export default function PostsPage() {
         logo_url: nuevoPost.url_diseno,
         descripcion: nuevoPost.descripcion,
         prioridad: 'Normal',
-        notas_cliente: '' // Nuevo post nace sin notas
+        notas_cliente: '' 
       }]);
 
       if (error) alert("Error al guardar: " + error.message);
@@ -224,7 +235,6 @@ export default function PostsPage() {
         </div>
       </div>
 
-      {/* HEADER SEMANAL */}
       <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="bg-purple-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-purple-600/20">
@@ -277,7 +287,6 @@ export default function PostsPage() {
                     <h4 className="text-[10px] font-bold text-purple-100 mb-1 leading-tight uppercase italic pr-8">{post.titulo}</h4>
                     <p className="text-[8px] text-gray-500 font-bold uppercase mb-2">{post.cliente}</p>
                     
-                    {/* VISUALIZACIÓN DE NOTAS CLIENTE (SOLO SI EXISTEN) */}
                     {post.notas_cliente && (
                       <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 mb-3">
                         <div className="flex justify-between items-start gap-1">
@@ -317,7 +326,6 @@ export default function PostsPage() {
         ))}
       </div>
 
-      {/* MODAL DE EDICIÓN / CREACIÓN */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
@@ -329,7 +337,6 @@ export default function PostsPage() {
             </div>
             <div className="p-6 md:p-8 space-y-5 pb-10 md:pb-8">
               
-              {/* CAMPO DE NOTAS DEL CLIENTE (LECTURA) */}
               {nuevoPost.notas_cliente && (
                 <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-2xl">
                   <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1 block">Ajustes del Cliente:</label>

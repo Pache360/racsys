@@ -1,6 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
-import Link from 'next/link';
+import Link from 'next/navigation'; // Corregido: para Next.js 13+ se usa navigation o Link de 'next/link'
+import NextLink from 'next/link';
 import { useRouter } from 'next/navigation'; 
 import { supabase } from '@/lib/supabase';
 import { 
@@ -18,7 +19,7 @@ const ESTADOS_PROYECTO = {
 export default function Home() {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [idEditando, setIdEditando] = useState<string | null>(null); // NUEVO: Estado para edición
+  const [idEditando, setIdEditando] = useState<string | null>(null);
   const [categoria, setCategoria] = useState<keyof typeof ESTADOS_PROYECTO>('Fotografía');
   const [loading, setLoading] = useState(false);
   const [estadoProyecto, setEstadoProyecto] = useState<string>(''); 
@@ -87,7 +88,7 @@ export default function Home() {
     fetchDatos();
   }, []);
 
-  // --- LÓGICA DE EDICIÓN ---
+  // --- LÓGICA DE EDICIÓN MEJORADA ---
   const abrirEdicion = (proy: any) => {
     setIdEditando(proy.id);
     setCategoria(proy.tipo as keyof typeof ESTADOS_PROYECTO);
@@ -146,13 +147,20 @@ export default function Home() {
       ]);
     }
 
+    // CORRECCIÓN DE FECHA: Evita el desfase de un día
+    const corregirFecha = (fechaStr: string) => {
+      if (!fechaStr) return null;
+      // Esto asegura que la fecha se guarde tal cual se seleccionó en el input
+      return fechaStr;
+    };
+
     const dataProyecto = { 
       titulo: formData.titulo,
       cliente: nombreClienteFinal,
       categoria: categoria,
       descripcion: formData.descripcion,
-      fecha_entrega: formData.fecha_entrega || null,
-      fecha_tomas: formData.fecha_tomas || null,
+      fecha_entrega: corregirFecha(formData.fecha_entrega),
+      fecha_tomas: corregirFecha(formData.fecha_tomas),
       ubicacion: formData.ubicacion,
       prioridad: formData.prioridad,
       estado: estadoProyecto
@@ -184,7 +192,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8 relative">
-      
       <header className="flex flex-col md:flex-row justify-between items-center mb-8 md:mb-12 border-b border-purple-900/30 pb-6 gap-6 md:gap-0">
         <div className="text-center md:text-left">
           <h1 className="text-4xl font-extrabold tracking-tight italic">PACHE<span className="text-purple-500">360</span></h1>
@@ -195,36 +202,36 @@ export default function Home() {
           <button onClick={handleLogout} className="flex items-center justify-center gap-2 bg-red-900/20 hover:bg-red-900/40 text-red-400 border border-red-500/30 px-4 py-3 rounded-xl font-bold transition-all active:scale-95 text-xs uppercase w-full sm:w-auto">
             <ArrowRightOnRectangleIcon className="h-4 w-4" /> Salir
           </button>
-          <Link href="/clients" className="flex items-center justify-center gap-2 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-500/30 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 text-sm italic uppercase tracking-tight w-full sm:w-auto">
+          <NextLink href="/clients" className="flex items-center justify-center gap-2 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-500/30 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 text-sm italic uppercase tracking-tight w-full sm:w-auto">
             <UserGroupIcon className="h-5 w-5" /> Clientes
-          </Link>
-          <button onClick={() => { setIdEditando(null); setIsModalOpen(true); }} className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/20 active:scale-95 text-sm w-full sm:w-auto">
+          </NextLink>
+          <button onClick={() => { setIdEditando(null); setFormData({titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal', nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''}); setIsModalOpen(true); }} className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/20 active:scale-95 text-sm w-full sm:w-auto">
             <PlusIcon className="h-5 w-5" /> NUEVO PROYECTO
           </button>
         </div>
       </header>
 
       <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
-        <Link href="/fotos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
+        <NextLink href="/fotos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <CameraIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
           <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Fotografía</h3>
           <p className="text-2xl md:text-4xl font-black mt-1 md:mt-2 group-hover:text-purple-300">{conteos.fotos}</p>
-        </Link>
-        <Link href="/videos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
+        </NextLink>
+        <NextLink href="/videos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <VideoCameraIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
           <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Video</h3>
           <p className="text-2xl md:text-4xl font-black mt-1 md:mt-2 group-hover:text-purple-300">{conteos.videos}</p>
-        </Link>
-        <Link href="/youtube" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
+        </NextLink>
+        <NextLink href="/youtube" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <PlayIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
           <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">YouTube</h3>
           <p className="text-2xl md:text-4xl font-black mt-1 md:mt-2 group-hover:text-red-400">Canales</p>
-        </Link>
-        <Link href="/posts" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
+        </NextLink>
+        <NextLink href="/posts" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <ChatBubbleLeftRightIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
           <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Posts</h3>
           <p className="text-2xl md:text-4xl font-black mt-1 md:mt-2 group-hover:text-purple-300">{conteos.posts}</p>
-        </Link>
+        </NextLink>
       </section>
       
       <div className="bg-[#111] border border-gray-800 rounded-3xl p-4 md:p-8 shadow-2xl">
