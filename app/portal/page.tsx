@@ -95,12 +95,13 @@ export default function PortalCliente() {
     }
   };
 
+  // ACTUALIZADO: Ahora guarda en notas_cliente para no borrar la descripción
   const handleEnviarCambios = async (id: string) => {
     if (!textoCambios.trim()) return;
-    // Guardamos los cambios en la descripción o un campo de notas (aquí lo mando a descripción por ahora)
+    
     const { error } = await supabase.from('proyectos').update({ 
       estado: 'Cambios',
-      descripcion: `SOLICITUD DE CAMBIO DEL CLIENTE: ${textoCambios}` 
+      notas_cliente: textoCambios // <--- Cambiado aquí
     }).eq('id', id);
     
     if (!error) {
@@ -109,6 +110,8 @@ export default function PortalCliente() {
       setMostrarCambios(false);
       fetchContenidoVIP();
       alert("Solicitud enviada. El equipo de Pache 360 revisará tus ajustes.");
+    } else {
+      alert("Error al enviar cambios: " + error.message);
     }
   };
 
@@ -228,11 +231,19 @@ export default function PortalCliente() {
                 {!zoomImagen && <p className="text-center text-gray-600 text-[9px] uppercase font-black mt-2 tracking-widest">Haz clic en la imagen para ampliar</p>}
               </div>
 
-              {/* Descripción */}
+              {/* Descripción Original */}
               <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
                 <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Descripción del Proyecto</h4>
                 <p className="text-sm text-gray-300 leading-relaxed font-medium italic">"{proyectoSeleccionado.descripcion || "Sin descripción disponible."}"</p>
               </div>
+
+              {/* NUEVO: Visualización de notas previas del cliente si existen */}
+              {proyectoSeleccionado.notas_cliente && (
+                <div className="bg-orange-500/10 p-6 rounded-3xl border border-orange-500/20">
+                  <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 italic">Ajustes solicitados anteriormente:</h4>
+                  <p className="text-sm text-orange-100 font-medium">"{proyectoSeleccionado.notas_cliente}"</p>
+                </div>
+              )}
 
               {/* Acciones de Cliente */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

@@ -14,7 +14,8 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
   PaperClipIcon,
-  ChatBubbleLeftEllipsisIcon // NUEVO ICONO
+  ChatBubbleLeftEllipsisIcon,
+  CheckIcon // IMPORTAMOS ICONO PARA EL CHECK
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
@@ -29,7 +30,7 @@ export default function PostsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   
-  const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '', descripcion: '' });
+  const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' });
   const [uploading, setUploading] = useState(false);
   const [idEditando, setIdEditando] = useState<string | null>(null);
 
@@ -73,7 +74,8 @@ export default function PostsPage() {
         estado: p.estado || 'Parrilla',
         prioridad: p.prioridad || 'Normal',
         imagen: p.logo_url,
-        descripcion: p.descripcion || '' 
+        descripcion: p.descripcion || '',
+        notas_cliente: p.notas_cliente || '' // CARGAMOS LAS NOTAS
       }));
       setPosts(formateados);
     }
@@ -91,10 +93,24 @@ export default function PostsPage() {
       titulo: post.titulo,
       cliente: post.cliente,
       url_diseno: post.imagen || '',
-      descripcion: post.descripcion || ''
+      descripcion: post.descripcion || '',
+      notas_cliente: post.notas_cliente || ''
     });
     setIdEditando(post.id);
     setIsModalOpen(true);
+  };
+
+  // NUEVA FUNCIÓN: Marca cambios como realizados
+  const resolverCambios = async (id: string) => {
+    const { error } = await supabase
+      .from('proyectos')
+      .update({ 
+        notas_cliente: '', // Limpiamos la nota
+        estado: 'Diseño'   // Regresamos a diseño para nueva aprobación
+      })
+      .eq('id', id);
+
+    if (!error) fetchPosts();
   };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -157,7 +173,7 @@ export default function PostsPage() {
 
     setIsModalOpen(false);
     setIdEditando(null);
-    setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '' });
+    setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' });
     await fetchPosts();
   };
 
@@ -189,6 +205,7 @@ export default function PostsPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4">
+      {/* HEADER Y NAVEGACIÓN */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-[10px] font-bold uppercase tracking-widest">
           <ArrowLeftIcon className="h-3 w-3" /> Volver al Dashboard
@@ -255,19 +272,27 @@ export default function PostsPage() {
                     </div>
 
                     <h4 className="text-[10px] font-bold text-purple-100 mb-1 leading-tight uppercase italic pr-8">{post.titulo}</h4>
-                    <p className="text-[8px] text-gray-500 font-bold uppercase mb-3">{post.cliente}</p>
+                    <p className="text-[8px] text-gray-500 font-bold uppercase mb-2">{post.cliente}</p>
                     
-                    <div className="space-y-2">
-                      {/* BOTÓN "VER CAMBIOS" - SOLO SI EL ESTADO ES 'Cambios' */}
-                      {post.estado === 'Cambios' && (
-                        <button 
-                          onClick={() => abrirEdicion(post)}
-                          className="w-full flex items-center justify-center gap-1 bg-orange-500/20 border border-orange-500/50 py-2 rounded-lg text-orange-400 text-[8px] font-black uppercase animate-pulse"
-                        >
-                          <ChatBubbleLeftEllipsisIcon className="h-3 w-3" /> Ver Ajustes
-                        </button>
-                      )}
+                    {/* VISUALIZACIÓN DIRECTA DE CAMBIOS (NUEVO) */}
+                    {post.notas_cliente && (
+                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 mb-3 relative group/cambio">
+                        <div className="flex justify-between items-start gap-1">
+                          <p className="text-[8px] text-orange-200 font-medium italic leading-tight">
+                            "{post.notas_cliente}"
+                          </p>
+                          <button 
+                            onClick={() => resolverCambios(post.id)}
+                            className="bg-orange-500 text-white p-1 rounded-md hover:bg-green-500 transition-colors shadow-lg"
+                            title="Marcar como realizado"
+                          >
+                            <CheckIcon className="h-3 w-3 stroke-[3px]" />
+                          </button>
+                        </div>
+                      </div>
+                    )}
 
+                    <div className="space-y-2">
                       <select 
                         value={post.estado} 
                         className={`w-full text-[8px] font-black py-2 rounded-lg border border-opacity-20 outline-none appearance-none text-center cursor-pointer ${getEstadoColor(post.estado)}`} 
@@ -280,7 +305,7 @@ export default function PostsPage() {
                 </div>
               ))}
               <button 
-                onClick={() => { setIdEditando(null); setDiaSeleccionado(dia); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '' }); setIsModalOpen(true); }} 
+                onClick={() => { setIdEditando(null); setDiaSeleccionado(dia); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' }); setIsModalOpen(true); }} 
                 className="mt-auto py-3 border border-dashed border-gray-800/50 rounded-xl text-gray-700 hover:text-purple-400 hover:border-purple-400/30 transition-all text-[9px] font-black uppercase tracking-widest flex items-center justify-center gap-2"
               >
                 <PlusIcon className="h-3 w-3" /> Nuevo Post
@@ -290,6 +315,7 @@ export default function PostsPage() {
         ))}
       </div>
 
+      {/* MODAL */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
@@ -297,9 +323,17 @@ export default function PostsPage() {
               <h2 className="text-xs md:text-sm font-bold text-purple-400 uppercase italic">
                 {diaSeleccionado?.nombre} {diaSeleccionado?.soloDia} • {idEditando ? 'Editar Post' : 'Crear Post'}
               </h2>
-              <button onClick={() => { setIsModalOpen(false); setIdEditando(null); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '' }); }} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
+              <button onClick={() => { setIsModalOpen(false); setIdEditando(null); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' }); }} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
             <div className="p-6 md:p-8 space-y-5 pb-10 md:pb-8">
+              {/* NOTA DEL CLIENTE DENTRO DEL MODAL (LECTURA) */}
+              {nuevoPost.notas_cliente && (
+                <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-2xl">
+                  <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1 block">Ajustes solicitados:</label>
+                  <p className="text-xs text-white italic">"{nuevoPost.notas_cliente}"</p>
+                </div>
+              )}
+
               <div>
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Marca del Cliente</label>
                 <select value={nuevoPost.cliente} onChange={e => setNuevoPost({...nuevoPost, cliente: e.target.value})} className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold uppercase text-white">
