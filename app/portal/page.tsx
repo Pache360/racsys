@@ -57,6 +57,7 @@ export default function PortalCliente() {
       const soloMarcas = listaNombres.filter(n => n.toLowerCase() !== idSesion.toLowerCase());
       setMisMarcas(soloMarcas);
 
+      // Traemos todos los campos, incluyendo notas_cliente
       const { data: todosLosProyectos } = await supabase.from('proyectos').select('*');
 
       if (todosLosProyectos) {
@@ -95,13 +96,13 @@ export default function PortalCliente() {
     }
   };
 
-  // ACTUALIZADO: Ahora guarda en notas_cliente para no borrar la descripción
+  // VINCULADO: Ahora guarda exclusivamente en notas_cliente
   const handleEnviarCambios = async (id: string) => {
     if (!textoCambios.trim()) return;
     
     const { error } = await supabase.from('proyectos').update({ 
       estado: 'Cambios',
-      notas_cliente: textoCambios // <--- Cambiado aquí
+      notas_cliente: textoCambios // Se guarda en la columna nueva
     }).eq('id', id);
     
     if (!error) {
@@ -127,7 +128,6 @@ export default function PortalCliente() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
-      {/* HEADER */}
       <header className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 border-b border-white/5 pb-6 gap-6">
         <div>
           <h1 className="text-2xl font-black italic uppercase tracking-tighter text-white">PORTAL <span className="text-purple-500">PACHE360</span></h1>
@@ -143,7 +143,6 @@ export default function PortalCliente() {
         </div>
       </header>
 
-      {/* FILTROS */}
       {misMarcas.length > 1 && (
         <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 snap-x">
           <button onClick={() => setFiltroMarca('Todas')} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border ${filtroMarca === 'Todas' ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-800'}`}>Todas</button>
@@ -153,7 +152,6 @@ export default function PortalCliente() {
         </div>
       )}
 
-      {/* CONTENIDO */}
       {vista === 'Cuadrícula' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {eventosAMostrar.map((item) => (
@@ -203,11 +201,9 @@ export default function PortalCliente() {
         </div>
       )}
 
-      {/* MODAL DE DETALLE (EL PORTAL DINÁMICO) */}
       {proyectoSeleccionado && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 md:p-8 backdrop-blur-md">
           <div className="bg-[#0f0f0f] border border-gray-800 w-full max-w-4xl max-h-[90vh] rounded-4xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-300">
-            {/* Header del Modal */}
             <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#141414]">
               <div>
                 <h2 className="text-2xl font-black uppercase italic text-white">{proyectoSeleccionado.titulo}</h2>
@@ -218,34 +214,30 @@ export default function PortalCliente() {
               </button>
             </div>
 
-            {/* Contenido del Modal */}
             <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
-              {/* Visualización de Imagen/Diseño */}
-              <div className="relative group">
+              <div className="relative group text-center">
                 <img 
                   src={proyectoSeleccionado.logo_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000"} 
-                  className={`w-full ${zoomImagen ? 'h-auto' : 'max-h-100'} object-contain rounded-3xl border border-white/10 shadow-2xl cursor-zoom-in transition-all`}
+                  className={`mx-auto w-full ${zoomImagen ? 'h-auto' : 'max-h-100'} object-contain rounded-3xl border border-white/10 shadow-2xl cursor-zoom-in transition-all`}
                   alt="Diseño Pache 360"
                   onClick={() => setZoomImagen(!zoomImagen)}
                 />
                 {!zoomImagen && <p className="text-center text-gray-600 text-[9px] uppercase font-black mt-2 tracking-widest">Haz clic en la imagen para ampliar</p>}
               </div>
 
-              {/* Descripción Original */}
               <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
                 <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Descripción del Proyecto</h4>
                 <p className="text-sm text-gray-300 leading-relaxed font-medium italic">"{proyectoSeleccionado.descripcion || "Sin descripción disponible."}"</p>
               </div>
 
-              {/* NUEVO: Visualización de notas previas del cliente si existen */}
+              {/* LECTURA: Muestra las notas_cliente actuales si existen */}
               {proyectoSeleccionado.notas_cliente && (
                 <div className="bg-orange-500/10 p-6 rounded-3xl border border-orange-500/20">
-                  <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 italic">Ajustes solicitados anteriormente:</h4>
+                  <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 italic">Ajustes solicitados actualmente:</h4>
                   <p className="text-sm text-orange-100 font-medium">"{proyectoSeleccionado.notas_cliente}"</p>
                 </div>
               )}
 
-              {/* Acciones de Cliente */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <button 
                   onClick={() => setMostrarCambios(!mostrarCambios)}
@@ -264,7 +256,6 @@ export default function PortalCliente() {
                 </button>
               </div>
 
-              {/* Panel de Cambios (Oculto/Visible) */}
               {mostrarCambios && (
                 <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-orange-500/30 animate-in slide-in-from-bottom-4 duration-300">
                   <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-4 block underline">Escribe los cambios detallados:</label>

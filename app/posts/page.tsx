@@ -15,7 +15,7 @@ import {
   ChevronRightIcon,
   PaperClipIcon,
   ChatBubbleLeftEllipsisIcon,
-  CheckIcon // IMPORTAMOS ICONO PARA EL CHECK
+  CheckIcon 
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
@@ -30,6 +30,7 @@ export default function PostsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   
+  // ACTUALIZADO: Agregamos notas_cliente al estado inicial
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' });
   const [uploading, setUploading] = useState(false);
   const [idEditando, setIdEditando] = useState<string | null>(null);
@@ -75,7 +76,7 @@ export default function PostsPage() {
         prioridad: p.prioridad || 'Normal',
         imagen: p.logo_url,
         descripcion: p.descripcion || '',
-        notas_cliente: p.notas_cliente || '' // CARGAMOS LAS NOTAS
+        notas_cliente: p.notas_cliente || '' // <--- CONECTADO A SUPABASE
       }));
       setPosts(formateados);
     }
@@ -94,19 +95,19 @@ export default function PostsPage() {
       cliente: post.cliente,
       url_diseno: post.imagen || '',
       descripcion: post.descripcion || '',
-      notas_cliente: post.notas_cliente || ''
+      notas_cliente: post.notas_cliente || '' // <--- CARGAMOS LA NOTA
     });
     setIdEditando(post.id);
     setIsModalOpen(true);
   };
 
-  // NUEVA FUNCIÓN: Marca cambios como realizados
+  // Función para limpiar cambios y regresar a diseño
   const resolverCambios = async (id: string) => {
     const { error } = await supabase
       .from('proyectos')
       .update({ 
-        notas_cliente: '', // Limpiamos la nota
-        estado: 'Diseño'   // Regresamos a diseño para nueva aprobación
+        notas_cliente: '', 
+        estado: 'Diseño'
       })
       .eq('id', id);
 
@@ -148,6 +149,7 @@ export default function PostsPage() {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
     
     if (idEditando) {
+      // ACTUALIZADO: Aquí ya no enviamos notas_cliente para que no se borre al editar
       const { error } = await supabase.from('proyectos').update({
         titulo: nuevoPost.titulo,
         cliente: nuevoPost.cliente,
@@ -165,7 +167,8 @@ export default function PostsPage() {
         fecha_entrega: diaSeleccionado.fechaFull,
         logo_url: nuevoPost.url_diseno,
         descripcion: nuevoPost.descripcion,
-        prioridad: 'Normal'
+        prioridad: 'Normal',
+        notas_cliente: '' // Nuevo post nace sin notas
       }]);
 
       if (error) alert("Error al guardar: " + error.message);
@@ -205,7 +208,6 @@ export default function PostsPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4">
-      {/* HEADER Y NAVEGACIÓN */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-[10px] font-bold uppercase tracking-widest">
           <ArrowLeftIcon className="h-3 w-3" /> Volver al Dashboard
@@ -222,6 +224,7 @@ export default function PostsPage() {
         </div>
       </div>
 
+      {/* HEADER SEMANAL */}
       <header className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <div className="bg-purple-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-purple-600/20">
@@ -274,17 +277,16 @@ export default function PostsPage() {
                     <h4 className="text-[10px] font-bold text-purple-100 mb-1 leading-tight uppercase italic pr-8">{post.titulo}</h4>
                     <p className="text-[8px] text-gray-500 font-bold uppercase mb-2">{post.cliente}</p>
                     
-                    {/* VISUALIZACIÓN DIRECTA DE CAMBIOS (NUEVO) */}
+                    {/* VISUALIZACIÓN DE NOTAS CLIENTE (SOLO SI EXISTEN) */}
                     {post.notas_cliente && (
-                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 mb-3 relative group/cambio">
+                      <div className="bg-orange-500/10 border border-orange-500/30 rounded-lg p-2 mb-3">
                         <div className="flex justify-between items-start gap-1">
-                          <p className="text-[8px] text-orange-200 font-medium italic leading-tight">
+                          <p className="text-[8px] text-orange-200 font-medium italic leading-tight uppercase">
                             "{post.notas_cliente}"
                           </p>
                           <button 
                             onClick={() => resolverCambios(post.id)}
                             className="bg-orange-500 text-white p-1 rounded-md hover:bg-green-500 transition-colors shadow-lg"
-                            title="Marcar como realizado"
                           >
                             <CheckIcon className="h-3 w-3 stroke-[3px]" />
                           </button>
@@ -315,7 +317,7 @@ export default function PostsPage() {
         ))}
       </div>
 
-      {/* MODAL */}
+      {/* MODAL DE EDICIÓN / CREACIÓN */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
@@ -326,10 +328,11 @@ export default function PostsPage() {
               <button onClick={() => { setIsModalOpen(false); setIdEditando(null); setNuevoPost({ titulo: '', cliente: '', url_diseno: '', descripcion: '', notas_cliente: '' }); }} className="p-2"><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
             <div className="p-6 md:p-8 space-y-5 pb-10 md:pb-8">
-              {/* NOTA DEL CLIENTE DENTRO DEL MODAL (LECTURA) */}
+              
+              {/* CAMPO DE NOTAS DEL CLIENTE (LECTURA) */}
               {nuevoPost.notas_cliente && (
                 <div className="bg-orange-500/10 border border-orange-500/30 p-4 rounded-2xl">
-                  <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1 block">Ajustes solicitados:</label>
+                  <label className="text-[9px] font-black text-orange-400 uppercase tracking-widest mb-1 block">Ajustes del Cliente:</label>
                   <p className="text-xs text-white italic">"{nuevoPost.notas_cliente}"</p>
                 </div>
               )}
@@ -341,17 +344,18 @@ export default function PostsPage() {
                   {listaClientes.map(c => <option key={c.nombre} value={c.nombre}>{c.nombre}</option>)}
                 </select>
               </div>
+
               <div>
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Título del Post</label>
                 <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold text-white" />
               </div>
 
               <div>
-                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Descripción / Notas</label>
+                <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Descripción / Copy (Original)</label>
                 <textarea 
                   value={nuevoPost.descripcion} 
                   onChange={e => setNuevoPost({...nuevoPost, descripcion: e.target.value})} 
-                  placeholder="Copy del post o notas internas..." 
+                  placeholder="Copy del post..." 
                   className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-medium text-white min-h-20"
                 />
               </div>
