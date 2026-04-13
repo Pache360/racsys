@@ -12,12 +12,13 @@ import {
 const ESTADOS_PROYECTO = {
   Fotografía: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Autorizado', 'Entrega', 'Finalizado'],
   Video: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Autorizado', 'Entrega', 'Finalizado'],
-  Posts: ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Publicado', 'Programado']
+  Posts: ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Programado', 'Publicado']
 };
 
 export default function Home() {
   const router = useRouter();
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [idEditando, setIdEditando] = useState<string | null>(null); // NUEVO: Estado para edición
   const [categoria, setCategoria] = useState<keyof typeof ESTADOS_PROYECTO>('Fotografía');
   const [loading, setLoading] = useState(false);
   const [estadoProyecto, setEstadoProyecto] = useState<string>(''); 
@@ -61,7 +62,10 @@ export default function Home() {
         tipo: p.categoria,
         entrega: p.fecha_entrega,
         prioridad: p.prioridad || 'Normal',
-        estado: p.estado || 'Proceso' // <--- TRAEMOS EL ESTADO
+        estado: p.estado || 'Proceso',
+        descripcion: p.descripcion || '',
+        fecha_tomas: p.fecha_tomas || '',
+        ubicacion: p.ubicacion || ''
       }));
       setProyectosDB(formateados);
 
@@ -83,11 +87,30 @@ export default function Home() {
     fetchDatos();
   }, []);
 
+  // --- LÓGICA DE EDICIÓN ---
+  const abrirEdicion = (proy: any) => {
+    setIdEditando(proy.id);
+    setCategoria(proy.tipo as keyof typeof ESTADOS_PROYECTO);
+    setEstadoProyecto(proy.estado);
+    setFormData({
+      titulo: proy.nombre,
+      cliente: proy.cliente,
+      descripcion: proy.descripcion,
+      fecha_inicio: '', 
+      fecha_entrega: proy.entrega || '',
+      fecha_tomas: proy.fecha_tomas || '',
+      ubicacion: proy.ubicacion || '',
+      prioridad: proy.prioridad,
+      nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''
+    });
+    setIsModalOpen(true);
+  };
+
   useEffect(() => {
-    if (isModalOpen) {
+    if (isModalOpen && !idEditando) {
       setEstadoProyecto(ESTADOS_PROYECTO[categoria][0]);
     }
-  }, [categoria, isModalOpen]);
+  }, [categoria, isModalOpen, idEditando]);
 
   const getPrioridadColor = (prio: string) => {
     switch (prio) {
@@ -97,7 +120,6 @@ export default function Home() {
     }
   };
 
-  // --- NUEVA FUNCIÓN PARA COLORES DE ESTADO EN EL DASHBOARD ---
   const getEstadoColorBadge = (estado: string) => {
     switch (estado) {
       case 'Cambios': return 'text-red-400 border-red-500/30 bg-red-500/5';
@@ -112,7 +134,7 @@ export default function Home() {
     setLoading(true);
     let nombreClienteFinal = formData.prioridad === 'Cliente Nuevo' ? formData.nuevoClienteNombre : formData.cliente;
 
-    if (formData.prioridad === 'Cliente Nuevo') {
+    if (formData.prioridad === 'Cliente Nuevo' && !idEditando) {
       await supabase.from('clientes').insert([
         { 
           nombre: formData.nuevoClienteNombre, 
@@ -124,32 +146,33 @@ export default function Home() {
       ]);
     }
 
-    const { error } = await supabase.from('proyectos').insert([
-      { 
-        titulo: formData.titulo,
-        cliente: nombreClienteFinal,
-        categoria: categoria,
-        descripcion: formData.descripcion,
-        fecha_inicio: formData.fecha_inicio || null,
-        fecha_entrega: formData.fecha_entrega || null,
-        fecha_tomas: formData.fecha_tomas || null,
-        ubicacion: formData.ubicacion,
-        prioridad: formData.prioridad,
-        estado: estadoProyecto
-      }
-    ]);
+    const dataProyecto = { 
+      titulo: formData.titulo,
+      cliente: nombreClienteFinal,
+      categoria: categoria,
+      descripcion: formData.descripcion,
+      fecha_entrega: formData.fecha_entrega || null,
+      fecha_tomas: formData.fecha_tomas || null,
+      ubicacion: formData.ubicacion,
+      prioridad: formData.prioridad,
+      estado: estadoProyecto
+    };
 
-    if (error) {
-      alert('Error: ' + error.message);
+    if (idEditando) {
+      const { error } = await supabase.from('proyectos').update(dataProyecto).eq('id', idEditando);
+      if (error) alert('Error: ' + error.message);
     } else {
-      alert('¡Proyecto guardado con éxito!');
-      setIsModalOpen(false);
-      setFormData({
-        titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal',
-        nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''
-      });
-      await fetchDatos(); 
+      const { error } = await supabase.from('proyectos').insert([dataProyecto]);
+      if (error) alert('Error: ' + error.message);
     }
+
+    setIsModalOpen(false);
+    setIdEditando(null);
+    setFormData({
+      titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal',
+      nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''
+    });
+    await fetchDatos(); 
     setLoading(false);
   };
 
@@ -175,7 +198,7 @@ export default function Home() {
           <Link href="/clients" className="flex items-center justify-center gap-2 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-500/30 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 text-sm italic uppercase tracking-tight w-full sm:w-auto">
             <UserGroupIcon className="h-5 w-5" /> Clientes
           </Link>
-          <button onClick={() => setIsModalOpen(true)} className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/20 active:scale-95 text-sm w-full sm:w-auto">
+          <button onClick={() => { setIdEditando(null); setIsModalOpen(true); }} className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/20 active:scale-95 text-sm w-full sm:w-auto">
             <PlusIcon className="h-5 w-5" /> NUEVO PROYECTO
           </button>
         </div>
@@ -211,14 +234,12 @@ export default function Home() {
         </div>
         <div className="space-y-4">
           {proyectosOrdenados.length > 0 ? proyectosOrdenados.map((proy) => (
-            <Link href={`/proyecto/${proy.id}`} key={proy.id} className="block group">
+            <div key={proy.id} onClick={() => abrirEdicion(proy)} className="cursor-pointer block group">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 md:p-5 bg-[#1a1a1a] rounded-xl border-l-4 hover:bg-[#222] transition-all border border-gray-800 gap-3">
                 <div className="flex flex-col gap-1">
                   <div className="flex items-center gap-2 flex-wrap">
                     <h4 className="font-bold text-white text-base md:text-lg group-hover:text-purple-300 transition-colors uppercase italic">{proy.nombre}</h4>
                     <span className={`text-[8px] px-2 py-0.5 rounded-full border font-black uppercase ${getPrioridadColor(proy.prioridad)}`}>{proy.prioridad}</span>
-                    
-                    {/* --- MUESTRA EL ESTADO AQUÍ --- */}
                     <span className={`text-[8px] px-2 py-0.5 rounded-full border font-black uppercase italic ${getEstadoColorBadge(proy.estado)}`}>
                       {proy.estado}
                     </span>
@@ -230,7 +251,7 @@ export default function Home() {
                   <span className="text-[10px] md:text-xs font-mono text-gray-400 bg-gray-800/50 px-2 py-1 rounded-md border border-gray-700">{proy.entrega ? `VENCE: ${proy.entrega}` : 'SIN FECHA'}</span>
                 </div>
               </div>
-            </Link>
+            </div>
           )) : <div className="text-center py-10 text-gray-600 italic">No hay proyectos pendientes.</div>}
         </div>
       </div>
@@ -239,8 +260,10 @@ export default function Home() {
         <div className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4 animate-in fade-in duration-300">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-2xl rounded-t-3xl md:rounded-3xl shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border-t-4 border-t-purple-500">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
-              <h2 className="text-lg md:text-xl font-bold text-purple-400 uppercase italic">Nuevo Proyecto</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-500 hover:text-white p-2">
+              <h2 className="text-lg md:text-xl font-bold text-purple-400 uppercase italic">
+                {idEditando ? 'Editar Proyecto' : 'Nuevo Proyecto'}
+              </h2>
+              <button onClick={() => { setIsModalOpen(false); setIdEditando(null); }} className="text-gray-500 hover:text-white p-2">
                 <XMarkIcon className="h-6 w-6" />
               </button>
             </div>
@@ -248,7 +271,7 @@ export default function Home() {
             <form className="p-6 md:p-8 grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6 overflow-y-auto">
               <div className="md:col-span-2 space-y-1">
                 <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Título del Proyecto</label>
-                <input required value={formData.titulo} onChange={(e) => setFormData({...formData, titulo: e.target.value})} type="text" placeholder="Ej: Sesión Gastronómica Mayo" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none transition-all text-sm font-bold text-white" />
+                <input required value={formData.titulo} onChange={(e) => setFormData({...formData, titulo: e.target.value})} type="text" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none transition-all text-sm font-bold text-white" />
               </div>
 
               <div className="space-y-1">
@@ -282,16 +305,6 @@ export default function Home() {
                 </div>
               </div>
 
-              {formData.prioridad === 'Cliente Nuevo' && (
-                <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-2 gap-3 md:gap-4 bg-cyan-950/20 p-4 md:p-6 rounded-2xl border border-cyan-500/30">
-                  <div className="md:col-span-2"><h3 className="text-cyan-400 text-xs font-black uppercase tracking-widest">Nueva Marca</h3></div>
-                  <input type="text" value={formData.nuevoClienteNombre} onChange={(e) => setFormData({...formData, nuevoClienteNombre: e.target.value})} placeholder="Marca" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 outline-none text-sm" />
-                  <input type="text" value={formData.nuevoClienteContacto} onChange={(e) => setFormData({...formData, nuevoClienteContacto: e.target.value})} placeholder="WhatsApp" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 outline-none text-sm" />
-                  <input type="email" value={formData.nuevoClienteCorreo} onChange={(e) => setFormData({...formData, nuevoClienteCorreo: e.target.value})} placeholder="Email" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 outline-none text-sm" />
-                  <input type="text" value={formData.nuevoClienteLogo} onChange={(e) => setFormData({...formData, nuevoClienteLogo: e.target.value})} placeholder="URL Logo" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 outline-none text-sm" />
-                </div>
-              )}
-
               <div className="md:col-span-2 space-y-1">
                 <label className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Descripción</label>
                 <textarea value={formData.descripcion} onChange={(e) => setFormData({...formData, descripcion: e.target.value})} rows={2} className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-3 focus:border-purple-500 outline-none text-sm text-white font-medium" placeholder="Brief..."></textarea>
@@ -313,7 +326,9 @@ export default function Home() {
               </div>
 
               <div className="md:col-span-2 pt-4 pb-8 md:pb-0">
-                <button type="button" onClick={handleSave} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest disabled:opacity-50 text-sm active:scale-95">{loading ? 'Guardando...' : 'Crear Proyecto'}</button>
+                <button type="button" onClick={handleSave} disabled={loading} className="w-full bg-purple-600 hover:bg-purple-500 text-white font-black py-4 rounded-2xl transition-all uppercase tracking-widest disabled:opacity-50 text-sm active:scale-95">
+                  {loading ? 'Guardando...' : idEditando ? 'Actualizar Proyecto' : 'Crear Proyecto'}
+                </button>
               </div>
             </form>
           </div>
