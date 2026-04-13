@@ -312,7 +312,7 @@ export default function PostsPage() {
                   value={nuevoPost.descripcion} 
                   onChange={e => setNuevoPost({...nuevoPost, descripcion: e.target.value})} 
                   placeholder="Copy del post o notas internas..." 
-                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-medium text-white min-h-[80px]"
+                  className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-medium text-white min-h-20"
                 />
               </div>
               

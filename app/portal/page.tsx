@@ -5,8 +5,10 @@ import {
   CalendarIcon, 
   ArrowRightOnRectangleIcon,
   RectangleGroupIcon,
-  Squares2X2Icon, // Icono para vista cuadrícula
-  ListBulletIcon  // Icono para lista
+  Squares2X2Icon,
+  XMarkIcon,
+  CheckCircleIcon,
+  ChatBubbleLeftEllipsisIcon
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -17,9 +19,16 @@ export default function PortalCliente() {
   const [vista, setVista] = useState<'Cuadrícula' | 'Calendario'>('Cuadrícula');
   const [duenoNombre, setDuenoNombre] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // ESTADOS PARA EL MODAL DE DETALLE
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<any>(null);
+  const [mostrarCambios, setMostrarCambios] = useState(false);
+  const [textoCambios, setTextoCambios] = useState('');
+  const [zoomImagen, setZoomImagen] = useState(false);
+
   const router = useRouter();
 
-  useEffect(() => {
+  const fetchContenidoVIP = async () => {
     const cookies = document.cookie.split('; ');
     const clienteIdCookie = cookies.find(row => row.startsWith('pache_cliente_id='));
     const idSesion = clienteIdCookie ? decodeURIComponent(clienteIdCookie.split('=')[1]) : null;
@@ -30,49 +39,43 @@ export default function PortalCliente() {
     }
 
     setDuenoNombre(idSesion);
+    setLoading(true);
 
-    const fetchContenidoVIP = async () => {
-      setLoading(true);
-      try {
-        const { data: clienteDB } = await supabase
-          .from('clientes')
-          .select('*')
-          .eq('nombre', idSesion)
-          .single();
+    try {
+      const { data: clienteDB } = await supabase
+        .from('clientes')
+        .select('*')
+        .eq('nombre', idSesion)
+        .single();
 
-        const { data: marcasAsociadas } = await supabase
-          .from('clientes')
-          .select('nombre')
-          .or(`dueno_id.eq."${idSesion}",dueno_id.eq."${clienteDB?.acceso_pass || 'N/A'}",nombre.eq."${idSesion}"`);
+      const { data: marcasAsociadas } = await supabase
+        .from('clientes')
+        .select('nombre')
+        .or(`dueno_id.eq."${idSesion}",dueno_id.eq."${clienteDB?.acceso_pass || 'N/A'}",nombre.eq."${idSesion}"`);
 
-        // --- CAMBIO APLICADO: Filtramos el nombre del dueño para que no aparezca en los botones ---
-        const listaNombres = marcasAsociadas ? marcasAsociadas.map(m => m.nombre) : [idSesion];
-        
-        // Aquí filtramos para que 'misMarcas' (los botones) solo contenga lo que NO sea el nombre del dueño
-        const soloMarcas = listaNombres.filter(n => n.toLowerCase() !== idSesion.toLowerCase());
-        setMisMarcas(soloMarcas);
+      const listaNombres = marcasAsociadas ? marcasAsociadas.map(m => m.nombre) : [idSesion];
+      const soloMarcas = listaNombres.filter(n => n.toLowerCase() !== idSesion.toLowerCase());
+      setMisMarcas(soloMarcas);
 
-        const { data: todosLosProyectos } = await supabase
-          .from('proyectos')
-          .select('*');
+      const { data: todosLosProyectos } = await supabase.from('proyectos').select('*');
 
-        if (todosLosProyectos) {
-          const filtrados = todosLosProyectos.filter(proy => {
-            const pCliente = proy.cliente?.toLowerCase() || "";
-            // La búsqueda de proyectos sigue usando 'listaNombres' completa para no perder info
-            return listaNombres.some(n => 
-              pCliente.includes(n.toLowerCase()) || n.toLowerCase().includes(pCliente)
-            );
-          });
-          setEventos(filtrados);
-        }
-      } catch (err) {
-        console.error("Error:", err);
-      } finally {
-        setLoading(false);
+      if (todosLosProyectos) {
+        const filtrados = todosLosProyectos.filter(proy => {
+          const pCliente = proy.cliente?.toLowerCase() || "";
+          return listaNombres.some(n => 
+            pCliente.includes(n.toLowerCase()) || n.toLowerCase().includes(pCliente)
+          );
+        });
+        setEventos(filtrados);
       }
-    };
+    } catch (err) {
+      console.error("Error:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchContenidoVIP();
   }, [router]);
 
@@ -82,7 +85,33 @@ export default function PortalCliente() {
     router.push('/login');
   };
 
-  // Filtrado final basado en el selector de marca
+  // FUNCIONES DE INTERACCIÓN DEL CLIENTE
+  const handleAutorizar = async (id: string) => {
+    const { error } = await supabase.from('proyectos').update({ estado: 'Autorizado' }).eq('id', id);
+    if (!error) {
+      setProyectoSeleccionado(null);
+      fetchContenidoVIP();
+      alert("¡Proyecto Autorizado! Pache 360 procederá con la entrega/publicación.");
+    }
+  };
+
+  const handleEnviarCambios = async (id: string) => {
+    if (!textoCambios.trim()) return;
+    // Guardamos los cambios en la descripción o un campo de notas (aquí lo mando a descripción por ahora)
+    const { error } = await supabase.from('proyectos').update({ 
+      estado: 'Cambios',
+      descripcion: `SOLICITUD DE CAMBIO DEL CLIENTE: ${textoCambios}` 
+    }).eq('id', id);
+    
+    if (!error) {
+      setProyectoSeleccionado(null);
+      setTextoCambios('');
+      setMostrarCambios(false);
+      fetchContenidoVIP();
+      alert("Solicitud enviada. El equipo de Pache 360 revisará tus ajustes.");
+    }
+  };
+
   const eventosAMostrar = filtroMarca === 'Todas' 
     ? eventos 
     : eventos.filter(e => e.cliente === filtroMarca);
@@ -103,85 +132,57 @@ export default function PortalCliente() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* SELECTOR DE VISTA */}
           <div className="flex bg-[#111] p-1 rounded-xl border border-gray-800">
-            <button 
-              onClick={() => setVista('Cuadrícula')}
-              className={`p-2 rounded-lg transition-all ${vista === 'Cuadrícula' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}
-            >
-              <Squares2X2Icon className="h-5 w-5" />
-            </button>
-            <button 
-              onClick={() => setVista('Calendario')}
-              className={`p-2 rounded-lg transition-all ${vista === 'Calendario' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}
-            >
-              <CalendarIcon className="h-5 w-5" />
-            </button>
+            <button onClick={() => setVista('Cuadrícula')} className={`p-2 rounded-lg transition-all ${vista === 'Cuadrícula' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}><Squares2X2Icon className="h-5 w-5" /></button>
+            <button onClick={() => setVista('Calendario')} className={`p-2 rounded-lg transition-all ${vista === 'Calendario' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}><CalendarIcon className="h-5 w-5" /></button>
           </div>
-
-          <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95 ml-auto">
-            <ArrowRightOnRectangleIcon className="h-5 w-5" />
-          </button>
+          <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95 ml-auto"><ArrowRightOnRectangleIcon className="h-5 w-5" /></button>
         </div>
       </header>
 
-      {/* FILTROS DE MARCA: Ahora solo mostrará marcas reales */}
+      {/* FILTROS */}
       {misMarcas.length > 1 && (
         <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 snap-x">
-          <button 
-            onClick={() => setFiltroMarca('Todas')}
-            className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border ${filtroMarca === 'Todas' ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-800'}`}
-          >
-            Todas
-          </button>
+          <button onClick={() => setFiltroMarca('Todas')} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border ${filtroMarca === 'Todas' ? 'bg-white text-black border-white' : 'bg-transparent text-gray-500 border-gray-800'}`}>Todas</button>
           {misMarcas.map(m => (
-            <button 
-              key={m}
-              onClick={() => setFiltroMarca(m)}
-              className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border whitespace-nowrap ${filtroMarca === m ? 'bg-purple-600 text-white border-purple-500' : 'bg-transparent text-gray-500 border-gray-800'}`}
-            >
-              {m}
-            </button>
+            <button key={m} onClick={() => setFiltroMarca(m)} className={`px-4 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all snap-start border whitespace-nowrap ${filtroMarca === m ? 'bg-purple-600 text-white border-purple-500' : 'bg-transparent text-gray-500 border-gray-800'}`}>{m}</button>
           ))}
         </div>
       )}
 
-      {/* VISTA CONTENIDO */}
+      {/* CONTENIDO */}
       {vista === 'Cuadrícula' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {eventosAMostrar.length > 0 ? eventosAMostrar.map((item) => (
-            <div key={item.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all">
+          {eventosAMostrar.map((item) => (
+            <div 
+              key={item.id} 
+              onClick={() => setProyectoSeleccionado(item)}
+              className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all cursor-pointer"
+            >
               <div className="flex justify-between items-start mb-4">
                 <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                   item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
                   item.categoria === 'Video' ? 'border-orange-500 text-orange-400 bg-orange-500/10' :
                   'border-blue-500 text-blue-400 bg-blue-500/10'
-                }`}>
-                  {item.categoria}
-                </span>
-                <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]">
-                  <CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PROX."}
-                </div>
+                }`}>{item.categoria}</span>
+                <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]"><CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PROX."}</div>
               </div>
               <h3 className="text-xl font-bold uppercase italic mb-1 text-white">{item.titulo}</h3>
-              <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1">
-                <RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}
-              </p>
+              <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1"><RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}</p>
               <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
                 <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
-                <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' ? 'text-green-400' : 'text-purple-400'}`}>
+                <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' || item.estado === 'Autorizado' ? 'text-green-400' : 'text-purple-400'}`}>
                   {item.estado}
                 </span>
               </div>
             </div>
-          )) : <NoContent />}
+          ))}
         </div>
       ) : (
-        /* VISTA CALENDARIO SIMPLIFICADA */
         <div className="bg-[#111] border border-gray-800 rounded-[2.5rem] p-6 md:p-10 shadow-2xl">
           <div className="space-y-6">
             {eventosAMostrar.sort((a,b) => new Date(a.fecha_entrega).getTime() - new Date(b.fecha_entrega).getTime()).map(item => (
-              <div key={item.id} className="flex gap-4 items-center border-b border-gray-800/50 pb-6 last:border-0">
+              <div key={item.id} onClick={() => setProyectoSeleccionado(item)} className="flex gap-4 items-center border-b border-gray-800/50 pb-6 last:border-0 cursor-pointer hover:bg-white/5 p-2 rounded-2xl transition-all">
                 <div className="text-center min-w-15">
                   <span className="block text-[10px] font-black text-purple-500 uppercase">{new Date(item.fecha_entrega).toLocaleString('es-MX', {month: 'short'})}</span>
                   <span className="block text-2xl font-black text-white">{new Date(item.fecha_entrega).getDate() + 1}</span>
@@ -190,12 +191,87 @@ export default function PortalCliente() {
                   <h4 className="text-sm font-black uppercase italic text-white leading-none">{item.titulo}</h4>
                   <span className="text-[10px] text-gray-500 uppercase font-bold">{item.cliente} • {item.categoria}</span>
                 </div>
-                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${item.estado === 'Entregado' ? 'border-green-500 text-green-400' : 'border-purple-500 text-purple-400'}`}>
+                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${item.estado === 'Entregado' || item.estado === 'Autorizado' ? 'border-green-500 text-green-400' : 'border-purple-500 text-purple-400'}`}>
                   {item.estado}
                 </div>
               </div>
             ))}
-            {eventosAMostrar.length === 0 && <NoContent />}
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE DETALLE (EL PORTAL DINÁMICO) */}
+      {proyectoSeleccionado && (
+        <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 md:p-8 backdrop-blur-md">
+          <div className="bg-[#0f0f0f] border border-gray-800 w-full max-w-4xl max-h-[90vh] rounded-4xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-300">
+            {/* Header del Modal */}
+            <div className="p-6 border-b border-white/5 flex justify-between items-center bg-[#141414]">
+              <div>
+                <h2 className="text-2xl font-black uppercase italic text-white">{proyectoSeleccionado.titulo}</h2>
+                <p className="text-purple-500 text-[10px] font-bold uppercase tracking-widest">{proyectoSeleccionado.cliente} • {proyectoSeleccionado.categoria}</p>
+              </div>
+              <button onClick={() => {setProyectoSeleccionado(null); setMostrarCambios(false);}} className="bg-white/10 p-2 rounded-full hover:bg-white/20 transition-all">
+                <XMarkIcon className="h-6 w-6" />
+              </button>
+            </div>
+
+            {/* Contenido del Modal */}
+            <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
+              {/* Visualización de Imagen/Diseño */}
+              <div className="relative group">
+                <img 
+                  src={proyectoSeleccionado.logo_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000"} 
+                  className={`w-full ${zoomImagen ? 'h-auto' : 'max-h-100'} object-contain rounded-3xl border border-white/10 shadow-2xl cursor-zoom-in transition-all`}
+                  alt="Diseño Pache 360"
+                  onClick={() => setZoomImagen(!zoomImagen)}
+                />
+                {!zoomImagen && <p className="text-center text-gray-600 text-[9px] uppercase font-black mt-2 tracking-widest">Haz clic en la imagen para ampliar</p>}
+              </div>
+
+              {/* Descripción */}
+              <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
+                <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Descripción del Proyecto</h4>
+                <p className="text-sm text-gray-300 leading-relaxed font-medium italic">"{proyectoSeleccionado.descripcion || "Sin descripción disponible."}"</p>
+              </div>
+
+              {/* Acciones de Cliente */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <button 
+                  onClick={() => setMostrarCambios(!mostrarCambios)}
+                  className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 p-5 rounded-2xl hover:bg-orange-500/10 hover:border-orange-500/50 transition-all group"
+                >
+                  <ChatBubbleLeftEllipsisIcon className="h-6 w-6 text-orange-500 group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Solicitar Cambios</span>
+                </button>
+
+                <button 
+                  onClick={() => handleAutorizar(proyectoSeleccionado.id)}
+                  className="flex items-center justify-center gap-3 bg-purple-600 p-5 rounded-2xl hover:bg-purple-500 shadow-lg shadow-purple-600/20 transition-all group"
+                >
+                  <CheckCircleIcon className="h-6 w-6 text-white group-hover:scale-110 transition-transform" />
+                  <span className="text-[10px] font-black uppercase tracking-widest">Autorizar para Publicar</span>
+                </button>
+              </div>
+
+              {/* Panel de Cambios (Oculto/Visible) */}
+              {mostrarCambios && (
+                <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-orange-500/30 animate-in slide-in-from-bottom-4 duration-300">
+                  <label className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-4 block underline">Escribe los cambios detallados:</label>
+                  <textarea 
+                    value={textoCambios}
+                    onChange={(e) => setTextoCambios(e.target.value)}
+                    className="w-full bg-black border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-orange-500 outline-none min-h-30"
+                    placeholder="Ej: El logo se ve muy pequeño, por favor cambiar el color del fondo a blanco..."
+                  />
+                  <button 
+                    onClick={() => handleEnviarCambios(proyectoSeleccionado.id)}
+                    className="mt-4 w-full bg-orange-600 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest hover:bg-orange-500 transition-all"
+                  >
+                    Enviar Solicitud de Cambio
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
