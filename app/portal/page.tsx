@@ -20,7 +20,6 @@ export default function PortalCliente() {
   const [duenoNombre, setDuenoNombre] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // ESTADOS PARA EL MODAL DE DETALLE
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<any>(null);
   const [mostrarCambios, setMostrarCambios] = useState(false);
   const [textoCambios, setTextoCambios] = useState('');
@@ -57,7 +56,6 @@ export default function PortalCliente() {
       const soloMarcas = listaNombres.filter(n => n.toLowerCase() !== idSesion.toLowerCase());
       setMisMarcas(soloMarcas);
 
-      // Traemos todos los campos, incluyendo notas_cliente
       const { data: todosLosProyectos } = await supabase.from('proyectos').select('*');
 
       if (todosLosProyectos) {
@@ -86,7 +84,6 @@ export default function PortalCliente() {
     router.push('/login');
   };
 
-  // FUNCIONES DE INTERACCIÓN DEL CLIENTE
   const handleAutorizar = async (id: string) => {
     const { error } = await supabase.from('proyectos').update({ estado: 'Autorizado' }).eq('id', id);
     if (!error) {
@@ -96,13 +93,12 @@ export default function PortalCliente() {
     }
   };
 
-  // VINCULADO: Ahora guarda exclusivamente en notas_cliente
   const handleEnviarCambios = async (id: string) => {
     if (!textoCambios.trim()) return;
     
     const { error } = await supabase.from('proyectos').update({ 
       estado: 'Cambios',
-      notas_cliente: textoCambios // Se guarda en la columna nueva
+      notas_cliente: textoCambios 
     }).eq('id', id);
     
     if (!error) {
@@ -158,23 +154,34 @@ export default function PortalCliente() {
             <div 
               key={item.id} 
               onClick={() => setProyectoSeleccionado(item)}
-              className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all cursor-pointer"
+              className="bg-[#111] border border-gray-800 rounded-3xl shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all cursor-pointer flex flex-col"
             >
-              <div className="flex justify-between items-start mb-4">
-                <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
-                  item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
-                  item.categoria === 'Video' ? 'border-orange-500 text-orange-400 bg-orange-500/10' :
-                  'border-blue-500 text-blue-400 bg-blue-500/10'
-                }`}>{item.categoria}</span>
-                <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]"><CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PROX."}</div>
+              {/* VISTA PREVIA DE LA IMAGEN (AÑADIDO) */}
+              <div className="h-48 w-full overflow-hidden bg-black border-b border-gray-800">
+                <img 
+                  src={item.logo_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000"} 
+                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-70 group-hover:opacity-100"
+                  alt={item.titulo}
+                />
               </div>
-              <h3 className="text-xl font-bold uppercase italic mb-1 text-white">{item.titulo}</h3>
-              <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1"><RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}</p>
-              <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
-                <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
-                <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' || item.estado === 'Autorizado' ? 'text-green-400' : 'text-purple-400'}`}>
-                  {item.estado}
-                </span>
+
+              <div className="p-6">
+                <div className="flex justify-between items-start mb-4">
+                  <span className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                    item.categoria === 'Fotografía' ? 'border-purple-500 text-purple-400 bg-purple-500/10' :
+                    item.categoria === 'Video' ? 'border-orange-500 text-orange-400 bg-orange-500/10' :
+                    'border-blue-500 text-blue-400 bg-blue-500/10'
+                  }`}>{item.categoria}</span>
+                  <div className="flex items-center gap-1 text-gray-500 font-mono text-[10px]"><CalendarIcon className="h-3 w-3" /> {item.fecha_entrega || "PROX."}</div>
+                </div>
+                <h3 className="text-xl font-bold uppercase italic mb-1 text-white">{item.titulo}</h3>
+                <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1"><RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}</p>
+                <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
+                  <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
+                  <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' || item.estado === 'Autorizado' ? 'text-green-400' : 'text-purple-400'}`}>
+                    {item.estado}
+                  </span>
+                </div>
               </div>
             </div>
           ))}
@@ -230,7 +237,6 @@ export default function PortalCliente() {
                 <p className="text-sm text-gray-300 leading-relaxed font-medium italic">"{proyectoSeleccionado.descripcion || "Sin descripción disponible."}"</p>
               </div>
 
-              {/* LECTURA: Muestra las notas_cliente actuales si existen */}
               {proyectoSeleccionado.notas_cliente && (
                 <div className="bg-orange-500/10 p-6 rounded-3xl border border-orange-500/20">
                   <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 italic">Ajustes solicitados actualmente:</h4>
