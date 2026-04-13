@@ -19,13 +19,14 @@ import {
 } from '@heroicons/react/24/outline';
 
 export default function PostsPage() {
-  // ACTUALIZADO: El orden ahora empieza en Lunes
   const diasNombres = ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'];
   const estados = ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Programado', 'Publicado'];
 
   const [posts, setPosts] = useState<any[]>([]);
   const [filtroMarca, setFiltroMarca] = useState('');
   const [listaClientes, setListaClientes] = useState<any[]>([]);
+  
+  // ESTADO INICIAL: Forzamos que la fecha base sea el día de hoy al cargar
   const [fechaBase, setFechaBase] = useState(new Date());
   const [diasSemanaActual, setDiasSemanaActual] = useState<{ nombre: string, fechaFull: string, soloDia: number }[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -35,20 +36,20 @@ export default function PostsPage() {
   const [uploading, setUploading] = useState(false);
   const [idEditando, setIdEditando] = useState<string | null>(null);
 
-  // ACTUALIZADO: Lógica para que la semana inicie en Lunes y evitar desfase de fechas
+  // ACTUALIZADO: Lógica robusta para detectar el Lunes de la semana actual
   const generarSemana = () => {
     const fecha = new Date(fechaBase);
-    // Obtener el día de la semana (0=Dom, 1=Lun...)
-    const day = fecha.getDay();
-    // Ajustar para que el Lunes sea el primer día (si es domingo, retrocedemos 6 días)
-    const diff = fecha.getDate() - day + (day === 0 ? -6 : 1);
+    const diaSemana = fecha.getDay(); // 0 (Dom) a 6 (Sab)
+    
+    // Calculamos la diferencia para llegar al Lunes (1)
+    // Si es Domingo (0), restamos 6 días. De lo contrario restamos (diaSemana - 1)
+    const diff = fecha.getDate() - (diaSemana === 0 ? 6 : diaSemana - 1);
     const lunes = new Date(fecha.setDate(diff));
 
     const semana = diasNombres.map((nombre, index) => {
       const d = new Date(lunes);
       d.setDate(lunes.getDate() + index);
       
-      // Formatear manualmente YYYY-MM-DD para evitar errores de zona horaria (UTC vs Local)
       const anio = d.getFullYear();
       const mes = String(d.getMonth() + 1).padStart(2, '0');
       const dia = String(d.getDate()).padStart(2, '0');
