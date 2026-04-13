@@ -9,11 +9,11 @@ import {
   UserGroupIcon, ArrowRightOnRectangleIcon // Importamos icono de salida
 } from '@heroicons/react/24/outline';
 
-// --- NUEVA: Definición de Estados por Categoría ---
+// --- NUEVA: Definición de Estados por Categoría (ACTUALIZADA CON "AUTORIZADO") ---
 const ESTADOS_PROYECTO = {
-  Fotografía: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Entrega', 'Finalizado'],
-  Video: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Entrega', 'Finalizado'],
-  Posts: ['Parrilla', 'Diseño', 'Cambios', 'Publicado', 'Programado']
+  Fotografía: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Autorizado', 'Entrega', 'Finalizado'],
+  Video: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Autorizado', 'Entrega', 'Finalizado'],
+  Posts: ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Publicado', 'Programado']
 };
 
 export default function Home() {

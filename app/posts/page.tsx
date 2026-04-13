@@ -18,7 +18,8 @@ import {
 
 export default function PostsPage() {
   const diasNombres = ['Dom', 'Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab'];
-  const estados = ['Parrilla', 'Diseño', 'Cambios', 'Programado', 'Publicado'];
+  // ACTUALIZADO: Se añade 'Autorizado' a la lista de estados
+  const estados = ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Programado', 'Publicado'];
 
   const [posts, setPosts] = useState<any[]>([]);
   const [filtroMarca, setFiltroMarca] = useState('');
@@ -28,7 +29,6 @@ export default function PostsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [diaSeleccionado, setDiaSeleccionado] = useState<{ nombre: string, fechaFull: string, soloDia: number } | null>(null);
   
-  // ACTUALIZADO: Agregamos 'descripcion' al estado inicial
   const [nuevoPost, setNuevoPost] = useState({ titulo: '', cliente: '', url_diseno: '', descripcion: '' });
   const [uploading, setUploading] = useState(false);
   const [idEditando, setIdEditando] = useState<string | null>(null);
@@ -73,7 +73,7 @@ export default function PostsPage() {
         estado: p.estado || 'Parrilla',
         prioridad: p.prioridad || 'Normal',
         imagen: p.logo_url,
-        descripcion: p.descripcion || '' // Recuperamos la descripción
+        descripcion: p.descripcion || '' 
       }));
       setPosts(formateados);
     }
@@ -84,7 +84,6 @@ export default function PostsPage() {
     fetchPosts(); 
   }, [fechaBase]);
 
-  // ACTUALIZADO: Cargamos la descripción al editar
   const abrirEdicion = (post: any) => {
     const dia = diasSemanaActual.find(d => d.fechaFull === post.fecha_entrega) || null;
     setDiaSeleccionado(dia);
@@ -133,7 +132,6 @@ export default function PostsPage() {
     if (!nuevoPost.cliente || !nuevoPost.titulo || !diaSeleccionado) return alert("Selecciona marca, título y fecha");
     
     if (idEditando) {
-      // ACTUALIZAR POST EXISTENTE (Incluyendo descripción)
       const { error } = await supabase.from('proyectos').update({
         titulo: nuevoPost.titulo,
         cliente: nuevoPost.cliente,
@@ -143,7 +141,6 @@ export default function PostsPage() {
 
       if (error) alert("Error al actualizar: " + error.message);
     } else {
-      // INSERTAR NUEVO POST (Incluyendo descripción)
       const { error } = await supabase.from('proyectos').insert([{
         titulo: nuevoPost.titulo,
         cliente: nuevoPost.cliente,
@@ -176,11 +173,13 @@ export default function PostsPage() {
     fetchPosts();
   };
 
+  // ACTUALIZADO: Se añade el color cian para el estado "Autorizado"
   const getEstadoColor = (estado: string) => {
     switch (estado) {
       case 'Parrilla': return 'bg-gray-800 text-gray-400 border-gray-700';
       case 'Diseño': return 'bg-blue-900/20 text-blue-400 border-blue-500/30';
       case 'Cambios': return 'bg-red-900/20 text-red-400 border-red-500/30';
+      case 'Autorizado': return 'bg-cyan-900/20 text-cyan-400 border-cyan-500/30';
       case 'Programado': return 'bg-purple-900/20 text-purple-400 border-purple-500/30';
       case 'Publicado': return 'bg-green-900/20 text-green-400 border-green-500/30';
       default: return 'bg-gray-800';
@@ -191,7 +190,6 @@ export default function PostsPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4">
-      {/* HEADER Y NAVEGACIÓN (Sin cambios) */}
       <div className="mb-6 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all text-[10px] font-bold uppercase tracking-widest">
           <ArrowLeftIcon className="h-3 w-3" /> Volver al Dashboard
@@ -230,7 +228,6 @@ export default function PostsPage() {
         </div>
       </header>
 
-      {/* CALENDARIO (Sin cambios) */}
       <div className="flex overflow-x-auto pb-6 gap-3 md:grid md:grid-cols-7 md:gap-2 w-full snap-x scrollbar-hide">
         {diasSemanaActual.map((dia) => (
           <div key={dia.fechaFull} className="bg-[#111]/40 border border-gray-800/40 rounded-2xl p-3 flex flex-col gap-3 min-w-65 md:min-w-0 snap-center">
@@ -282,7 +279,6 @@ export default function PostsPage() {
         ))}
       </div>
 
-      {/* MODAL ACTUALIZADO: Incluye Descripción / Notas */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end md:items-center justify-center p-0 md:p-4">
           <div className="bg-[#111] border border-purple-500/30 w-full max-w-md rounded-t-4xl md:rounded-3xl overflow-hidden shadow-2xl flex flex-col">
@@ -305,7 +301,6 @@ export default function PostsPage() {
                 <input type="text" value={nuevoPost.titulo} onChange={e => setNuevoPost({...nuevoPost, titulo: e.target.value})} placeholder="Ej: Reel Detrás de Cámaras" className="w-full bg-[#0a0a0a] border border-gray-800 rounded-xl p-4 text-xs outline-none focus:border-purple-500 font-bold text-white" />
               </div>
 
-              {/* NUEVO: Campo de Descripción / Notas */}
               <div>
                 <label className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-2 block">Descripción / Notas</label>
                 <textarea 
@@ -321,7 +316,7 @@ export default function PostsPage() {
                 <div className="flex flex-col gap-2">
                   <label className={`flex flex-col items-center justify-center gap-3 bg-[#0a0a0a] border-2 border-dashed border-gray-700 rounded-2xl p-6 text-[10px] font-bold cursor-pointer hover:border-purple-500 transition-all ${uploading ? 'opacity-50' : ''}`}>
                     <PaperClipIcon className={`h-6 w-6 ${nuevoPost.url_diseno ? 'text-green-500' : 'text-purple-500'}`} />
-                    <span className="text-gray-400 uppercase tracking-widest">
+                    <span className="text-gray-400 uppercase tracking-widest text-center">
                         {uploading ? 'SUBIENDO...' : nuevoPost.url_diseno ? 'IMAGEN LISTA ✓' : 'PICAR PARA SUBIR DESDE PC'}
                     </span>
                     <input type="file" accept="image/*" onChange={handleUpload} disabled={uploading} className="hidden" />
