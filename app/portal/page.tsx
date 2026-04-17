@@ -8,7 +8,8 @@ import {
   Squares2X2Icon,
   XMarkIcon,
   CheckCircleIcon,
-  ChatBubbleLeftEllipsisIcon
+  ChatBubbleLeftEllipsisIcon,
+  ClockIcon // Importado para el historial
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
 
@@ -19,6 +20,9 @@ export default function PortalCliente() {
   const [vista, setVista] = useState<'Cuadrícula' | 'Calendario'>('Cuadrícula');
   const [duenoNombre, setDuenoNombre] = useState('');
   const [loading, setLoading] = useState(true);
+  
+  // NUEVO: Estado para alternar entre proyectos activos e historial
+  const [mostrarHistorial, setMostrarHistorial] = useState(false);
   
   const [proyectoSeleccionado, setProyectoSeleccionado] = useState<any>(null);
   const [mostrarCambios, setMostrarCambios] = useState(false);
@@ -112,9 +116,14 @@ export default function PortalCliente() {
     }
   };
 
-  const eventosAMostrar = filtroMarca === 'Todas' 
-    ? eventos 
-    : eventos.filter(e => e.cliente === filtroMarca);
+  // ACTUALIZADO: Lógica de filtrado para ocultar autorizados por defecto y filtrar por marca
+  const eventosAMostrar = eventos.filter(e => {
+    const cumpleMarca = filtroMarca === 'Todas' || e.cliente === filtroMarca;
+    const esFinalizado = ['Autorizado', 'Publicado', 'Finalizado', 'Entregado'].includes(e.estado);
+    
+    // Si mostrarHistorial es true, solo vemos los finalizados. Si es false, solo los activos.
+    return cumpleMarca && (mostrarHistorial ? esFinalizado : !esFinalizado);
+  });
 
   if (loading) return (
     <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
@@ -131,13 +140,48 @@ export default function PortalCliente() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
+          {/* GRUPO DE BOTONES DE VISTA Y FILTRO DE HISTORIAL */}
           <div className="flex bg-[#111] p-1 rounded-xl border border-gray-800">
-            <button onClick={() => setVista('Cuadrícula')} className={`p-2 rounded-lg transition-all ${vista === 'Cuadrícula' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}><Squares2X2Icon className="h-5 w-5" /></button>
-            <button onClick={() => setVista('Calendario')} className={`p-2 rounded-lg transition-all ${vista === 'Calendario' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}><CalendarIcon className="h-5 w-5" /></button>
+            <button 
+              onClick={() => setVista('Cuadrícula')} 
+              className={`p-2 rounded-lg transition-all ${vista === 'Cuadrícula' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}
+              title="Vista Cuadrícula"
+            >
+              <Squares2X2Icon className="h-5 w-5" />
+            </button>
+            <button 
+              onClick={() => setVista('Calendario')} 
+              className={`p-2 rounded-lg transition-all ${vista === 'Calendario' ? 'bg-purple-600 text-white' : 'text-gray-500'}`}
+              title="Vista Calendario"
+            >
+              <CalendarIcon className="h-5 w-5" />
+            </button>
+            
+            {/* NUEVO BOTÓN: Posts Anteriores / Historial */}
+            <div className="w-[1px] bg-gray-800 mx-1 my-1"></div>
+            <button 
+              onClick={() => setMostrarHistorial(!mostrarHistorial)} 
+              className={`p-2 rounded-lg transition-all flex items-center gap-2 ${mostrarHistorial ? 'bg-orange-600 text-white' : 'text-gray-500 hover:text-orange-400'}`}
+              title={mostrarHistorial ? "Ver Proyectos Activos" : "Ver Historial de Autorizados"}
+            >
+              <ClockIcon className="h-5 w-5" />
+              <span className="hidden md:block text-[9px] font-black uppercase tracking-widest">
+                {mostrarHistorial ? "Activos" : "Anteriores"}
+              </span>
+            </button>
           </div>
+          
           <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95 ml-auto"><ArrowRightOnRectangleIcon className="h-5 w-5" /></button>
         </div>
       </header>
+
+      {/* TÍTULO DINÁMICO DE SECCIÓN */}
+      <div className="mb-6">
+        <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-purple-500 flex items-center gap-2">
+          <div className={`w-2 h-2 rounded-full ${mostrarHistorial ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></div>
+          {mostrarHistorial ? "Historial de Proyectos Autorizados" : "Proyectos Pendientes de Revisión"}
+        </h2>
+      </div>
 
       {misMarcas.length > 1 && (
         <div className="flex items-center gap-3 mb-8 overflow-x-auto pb-2 snap-x">
@@ -148,7 +192,10 @@ export default function PortalCliente() {
         </div>
       )}
 
-      {vista === 'Cuadrícula' ? (
+      {/* CONTENIDO (se mantiene igual, usando eventosAMostrar filtrado) */}
+      {eventosAMostrar.length === 0 ? (
+        <NoContent />
+      ) : vista === 'Cuadrícula' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {eventosAMostrar.map((item) => (
             <div 
@@ -156,7 +203,6 @@ export default function PortalCliente() {
               onClick={() => setProyectoSeleccionado(item)}
               className="bg-[#111] border border-gray-800 rounded-3xl shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all cursor-pointer flex flex-col"
             >
-              {/* VISTA PREVIA DE LA IMAGEN (AÑADIDO) */}
               <div className="h-48 w-full overflow-hidden bg-black border-b border-gray-800">
                 <img 
                   src={item.logo_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000"} 
@@ -178,7 +224,7 @@ export default function PortalCliente() {
                 <p className="text-[9px] font-black text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-1"><RectangleGroupIcon className="h-3 w-3 text-purple-500" /> {item.cliente}</p>
                 <div className="bg-black border border-gray-800 rounded-2xl p-4 text-center">
                   <span className="text-[8px] font-black uppercase text-gray-600 block mb-1 tracking-[0.2em]">Estatus Actual</span>
-                  <span className={`text-xs font-bold uppercase italic ${item.estado === 'Entregado' || item.estado === 'Publicado' || item.estado === 'Autorizado' ? 'text-green-400' : 'text-purple-400'}`}>
+                  <span className={`text-xs font-bold uppercase italic ${['Entregado', 'Publicado', 'Autorizado', 'Finalizado'].includes(item.estado) ? 'text-green-400' : 'text-purple-400'}`}>
                     {item.estado}
                   </span>
                 </div>
@@ -199,7 +245,7 @@ export default function PortalCliente() {
                   <h4 className="text-sm font-black uppercase italic text-white leading-none">{item.titulo}</h4>
                   <span className="text-[10px] text-gray-500 uppercase font-bold">{item.cliente} • {item.categoria}</span>
                 </div>
-                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${item.estado === 'Entregado' || item.estado === 'Autorizado' ? 'border-green-500 text-green-400' : 'border-purple-500 text-purple-400'}`}>
+                <div className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase border ${['Entregado', 'Autorizado', 'Finalizado', 'Publicado'].includes(item.estado) ? 'border-green-500 text-green-400' : 'border-purple-500 text-purple-400'}`}>
                   {item.estado}
                 </div>
               </div>
@@ -208,6 +254,7 @@ export default function PortalCliente() {
         </div>
       )}
 
+      {/* MODAL DE DETALLE (se mantiene igual) */}
       {proyectoSeleccionado && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 md:p-8 backdrop-blur-md">
           <div className="bg-[#0f0f0f] border border-gray-800 w-full max-w-4xl max-h-[90vh] rounded-4xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-300">
@@ -244,23 +291,26 @@ export default function PortalCliente() {
                 </div>
               )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <button 
-                  onClick={() => setMostrarCambios(!mostrarCambios)}
-                  className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 p-5 rounded-2xl hover:bg-orange-500/10 hover:border-orange-500/50 transition-all group"
-                >
-                  <ChatBubbleLeftEllipsisIcon className="h-6 w-6 text-orange-500 group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Solicitar Cambios</span>
-                </button>
+              {/* ACCIONES: Solo visibles si no está autorizado aún */}
+              {!['Autorizado', 'Publicado', 'Finalizado'].includes(proyectoSeleccionado.estado) && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button 
+                    onClick={() => setMostrarCambios(!mostrarCambios)}
+                    className="flex items-center justify-center gap-3 bg-white/5 border border-white/10 p-5 rounded-2xl hover:bg-orange-500/10 hover:border-orange-500/50 transition-all group"
+                  >
+                    <ChatBubbleLeftEllipsisIcon className="h-6 w-6 text-orange-500 group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Solicitar Cambios</span>
+                  </button>
 
-                <button 
-                  onClick={() => handleAutorizar(proyectoSeleccionado.id)}
-                  className="flex items-center justify-center gap-3 bg-purple-600 p-5 rounded-2xl hover:bg-purple-500 shadow-lg shadow-purple-600/20 transition-all group"
-                >
-                  <CheckCircleIcon className="h-6 w-6 text-white group-hover:scale-110 transition-transform" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Autorizar para Publicar</span>
-                </button>
-              </div>
+                  <button 
+                    onClick={() => handleAutorizar(proyectoSeleccionado.id)}
+                    className="flex items-center justify-center gap-3 bg-purple-600 p-5 rounded-2xl hover:bg-purple-500 shadow-lg shadow-purple-600/20 transition-all group"
+                  >
+                    <CheckCircleIcon className="h-6 w-6 text-white group-hover:scale-110 transition-transform" />
+                    <span className="text-[10px] font-black uppercase tracking-widest">Autorizar para Publicar</span>
+                  </button>
+                </div>
+              )}
 
               {mostrarCambios && (
                 <div className="bg-[#1a1a1a] p-6 rounded-3xl border border-orange-500/30 animate-in slide-in-from-bottom-4 duration-300">
@@ -290,7 +340,7 @@ export default function PortalCliente() {
 function NoContent() {
   return (
     <div className="col-span-full text-center py-24 bg-[#111]/30 rounded-[3rem] border border-dashed border-gray-800">
-      <p className="text-gray-600 italic uppercase font-black text-sm tracking-widest">No hay contenido programado</p>
+      <p className="text-gray-600 italic uppercase font-black text-sm tracking-widest">No hay contenido en esta sección</p>
     </div>
   );
 }
