@@ -1,24 +1,33 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeftIcon, UserGroupIcon, PencilIcon, 
   TrashIcon, PhoneIcon, PlusIcon, XMarkIcon,
-  BanknotesIcon, TagIcon, Cog6ToothIcon,
-  BriefcaseIcon, RectangleGroupIcon // Nuevos iconos
+  TagIcon, Cog6ToothIcon,
+  BriefcaseIcon, RectangleGroupIcon 
 } from '@heroicons/react/24/outline';
 
+// Se define la interfaz para evitar el error "Unexpected any"
+interface Cliente {
+  id: string;
+  nombre: string;
+  contacto: string;
+  presupuesto_total: number;
+  monto_pagado: number;
+  logo_url: string;
+  acceso_pass: string;
+  dueno_id: string;
+}
+
 export default function ClientesPage() {
-  const [clientes, setClientes] = useState<any[]>([]);
+  const [clientes, setClientes] = useState<Cliente[]>([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [modoGestion, setModoGestion] = useState(false);
-
-  // --- NUEVA LÓGICA DE FILTRADO POR VISTA ---
   const [vistaFiltro, setVistaFiltro] = useState<'Dueños' | 'Marcas'>('Dueños');
-
   const [tipoRegistro, setTipoRegistro] = useState<'Dueño' | 'Marca'>('Dueño');
 
   const [clientForm, setClientForm] = useState({
@@ -31,20 +40,26 @@ export default function ClientesPage() {
     dueno_id: ''
   });
 
-  const fetchClientes = async () => {
+  // fetchClientes envuelto en useCallback para estabilidad
+  const fetchClientes = useCallback(async () => {
     const { data } = await supabase.from('clientes').select('*').order('nombre', { ascending: true });
-    if (data) setClientes(data);
-  };
+    if (data) setClientes(data as Cliente[]);
+  }, []);
 
-  useEffect(() => { fetchClientes(); }, []);
+  // useEffect corregido para evitar renderizado en cascada
+  useEffect(() => { 
+    const initFetch = async () => {
+      await fetchClientes();
+    };
+    initFetch();
+  }, [fetchClientes]);
 
-  // Filtrado de la lista según la vista seleccionada
   const clientesFiltrados = clientes.filter(c => {
     const esDueno = !c.dueno_id || c.dueno_id === '';
     return vistaFiltro === 'Dueños' ? esDueno : !esDueno;
   });
 
-  const handleOpenModal = (cliente?: any) => {
+  const handleOpenModal = (cliente?: Cliente) => {
     if (cliente) {
       setEditId(cliente.id);
       const esDueno = !cliente.dueno_id || cliente.dueno_id === '';
@@ -99,7 +114,6 @@ export default function ClientesPage() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
-      {/* NAVEGACIÓN */}
       <div className="mb-6 md:mb-8">
         <Link href="/" className="flex items-center gap-2 text-purple-400 hover:text-purple-300 transition-all w-fit text-[10px] md:text-xs font-bold uppercase tracking-widest">
           <ArrowLeftIcon className="h-4 w-4" />
@@ -107,7 +121,6 @@ export default function ClientesPage() {
         </Link>
       </div>
 
-      {/* HEADER */}
       <header className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-6">
         <div className="flex items-center gap-4">
           <div className="bg-cyan-600 p-2 md:p-3 rounded-xl md:rounded-2xl shadow-lg shadow-cyan-600/20 italic">
@@ -134,7 +147,6 @@ export default function ClientesPage() {
         </div>
       </header>
 
-      {/* --- NAVEGADOR DE VISTAS (DUEÑOS VS MARCAS) --- */}
       <div className="flex bg-[#111] p-1.5 rounded-2xl w-full max-w-md mb-10 border border-gray-800/50 mx-auto sm:mx-0">
         <button 
           onClick={() => setVistaFiltro('Dueños')}
@@ -150,7 +162,6 @@ export default function ClientesPage() {
         </button>
       </div>
 
-      {/* GRID FILTRADO */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {clientesFiltrados.map((c) => {
           const restan = c.presupuesto_total - c.monto_pagado;
@@ -173,7 +184,7 @@ export default function ClientesPage() {
 
               <div className="flex items-center gap-4 mb-6">
                 <div className="h-12 w-12 md:h-14 md:w-14 rounded-xl md:rounded-2xl bg-gray-800 border border-gray-700 flex items-center justify-center overflow-hidden font-black italic text-gray-500 shadow-inner shrink-0">
-                  {c.logo_url ? <img src={c.logo_url} className="w-full h-full object-cover" /> : c.nombre[0]}
+                  {c.logo_url ? <img src={c.logo_url} alt={c.nombre} className="w-full h-full object-cover" /> : c.nombre[0]}
                 </div>
                 <div className="pr-12 sm:pr-0">
                   <div className="flex items-center gap-2">
@@ -219,7 +230,6 @@ export default function ClientesPage() {
         </div>
       )}
 
-      {/* MODAL DE EDICIÓN / AGREGAR (Mantenido igual para no romper lógica) */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-[#111] border border-cyan-500/30 w-full max-w-md rounded-t-4xl sm:rounded-4xl shadow-2xl overflow-hidden border-t-4 border-t-cyan-500 max-h-[95vh] flex flex-col">
@@ -234,11 +244,11 @@ export default function ClientesPage() {
               </div>
               
               <div className="flex gap-2 bg-black p-1 rounded-xl">
-                {['Dueño', 'Marca'].map((tipo) => (
+                {(['Dueño', 'Marca'] as const).map((tipo) => (
                   <button
                     key={tipo}
                     type="button"
-                    onClick={() => setTipoRegistro(tipo as any)}
+                    onClick={() => setTipoRegistro(tipo)}
                     className={`flex-1 py-2 text-[10px] font-black uppercase rounded-lg transition-all ${tipoRegistro === tipo ? 'bg-cyan-600 text-white' : 'text-gray-500'}`}
                   >
                     {tipo}
