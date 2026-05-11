@@ -8,36 +8,41 @@ import {
   ArrowRightOnRectangleIcon, 
   DocumentArrowDownIcon,
   PhotoIcon,
-  CheckBadgeIcon
+  CheckBadgeIcon,
+  BookOpenIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
-// 1. SOLUCIÓN AL ERROR "ANY": Definimos la estructura de los datos
+interface Modulo {
+  modulo: string;
+  temas: string[];
+}
+
 interface Curso {
   id: string;
   nombre: string;
   ubicacion: string;
   fecha_curso: string;
+  temario: Modulo[];
 }
 
 interface Alumno {
   id: string;
   nombre_completo: string;
-  correo: string;
+  usuario: string;
   curso_id: string;
   pago_completado: boolean;
   progreso: number;
   evidencias: string[];
+  temas_completados: string[];
 }
 
 export default function AcademiaDashboard() {
-  // Aplicamos las interfaces aquí
   const [alumno, setAlumno] = useState<Alumno | null>(null);
   const [curso, setCurso] = useState<Curso | null>(null);
   const [loading, setLoading] = useState(true);
   const router = useRouter();
 
-  // 2. SOLUCIÓN AL ERROR DE DEPENDENCIA: Movemos handleLogout arriba y usamos useCallback
   const handleLogout = useCallback(() => {
     document.cookie = "pache_alumno_id=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict";
     router.push('/academia/login');
@@ -78,7 +83,7 @@ export default function AcademiaDashboard() {
     } finally {
       setLoading(false);
     }
-  }, [router, handleLogout]); // Añadimos handleLogout a las dependencias
+  }, [router, handleLogout]); 
 
   useEffect(() => {
     fetchDatosAlumno();
@@ -89,24 +94,23 @@ export default function AcademiaDashboard() {
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1280, 720] });
 
-    // MIENTRAS NO TENGAS LA IMAGEN, PONEMOS UN FONDO DE COLOR PARA PROBAR:
     doc.setFillColor(15, 15, 15);
     doc.rect(0, 0, 1280, 720, 'F');
     
-    doc.setTextColor(0, 255, 255); // Cyan
+    doc.setTextColor(0, 255, 255); 
     doc.setFontSize(50);
     doc.text("CERTIFICADO DE CAPACITACIÓN", 640, 200, { align: 'center' });
 
-    doc.setTextColor(255, 255, 255); // Blanco
+    doc.setTextColor(255, 255, 255); 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(60);
     doc.text(alumno.nombre_completo.toUpperCase(), 640, 350, { align: 'center' });
 
-    doc.setTextColor(150, 150, 150); // Gris
+    doc.setTextColor(150, 150, 150); 
     doc.setFontSize(24);
     doc.text(`Por haber concluido satisfactoriamente el curso:`, 640, 420, { align: 'center' });
     
-    doc.setTextColor(200, 150, 255); // Morado
+    doc.setTextColor(200, 150, 255); 
     doc.setFontSize(35);
     doc.text(`"${curso.nombre}"`, 640, 470, { align: 'center' });
 
@@ -118,12 +122,28 @@ export default function AcademiaDashboard() {
     doc.save(`Constancia_${alumno.nombre_completo.replace(/\s+/g, '_')}.pdf`);
   };
 
+  // LÓGICA PARA ENCONTRAR EL MÓDULO ACTUAL
+  const getModuloActual = () => {
+    if (!curso || !curso.temario) return null;
+    const completados = alumno?.temas_completados || [];
+
+    // Recorremos los módulos para encontrar el primero que no esté al 100%
+    for (const mod of curso.temario) {
+      const todosTerminados = mod.temas.every(t => completados.includes(t));
+      if (!todosTerminados) return mod;
+    }
+    
+    // Si terminó todos, mostramos el último
+    return curso.temario[curso.temario.length - 1] || null;
+  };
+
   if (loading) return <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center"><div className="animate-spin rounded-full h-12 w-12 border-t-2 border-cyan-500"></div></div>;
   if (!alumno) return null;
 
   const progreso = alumno.progreso || 0;
-  const cursoTerminado = progreso === 100;
+  const cursoTerminado = progreso >= 100;
   const puedeDescargar = cursoTerminado && alumno.pago_completado;
+  const moduloActual = getModuloActual();
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8">
@@ -157,6 +177,31 @@ export default function AcademiaDashboard() {
                 <div className={`h-full transition-all duration-1000 ${cursoTerminado ? 'bg-green-500' : 'bg-cyan-500'}`} style={{ width: `${progreso}%` }}></div>
               </div>
             </div>
+
+            {/* CAJA DEL MÓDULO ACTUAL (LO QUE EL ALUMNO VE) */}
+            {moduloActual && (
+              <div className="mb-6 bg-black border border-gray-800 rounded-2xl p-4">
+                <div className="flex items-center gap-2 text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-3">
+                  <BookOpenIcon className="h-4 w-4" /> Estudiando: {moduloActual.modulo}
+                </div>
+                <ul className="space-y-2">
+                  {moduloActual.temas.map((tema, i) => {
+                    const completado = alumno.temas_completados?.includes(tema);
+                    return (
+                      <li key={i} className="flex items-start gap-3">
+                        <div className={`mt-0.5 w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${completado ? 'bg-green-500 border-green-500' : 'border-gray-700'}`}>
+                          {completado && <CheckBadgeIcon className="w-3 h-3 text-black" />}
+                        </div>
+                        <span className={`text-xs ${completado ? 'text-gray-500 line-through' : 'text-white font-medium'}`}>{tema}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {cursoTerminado && (
+                  <p className="text-[10px] text-green-400 font-bold uppercase mt-4 text-center">¡Haz finalizado todos los temas!</p>
+                )}
+              </div>
+            )}
 
             <div className="flex items-center gap-3 bg-black/50 p-4 rounded-2xl border border-gray-800">
               <div className={`p-2 rounded-full ${alumno.pago_completado ? 'bg-green-500/20 text-green-400' : 'bg-orange-500/20 text-orange-400'}`}>

@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { AcademicCapIcon } from '@heroicons/react/24/outline';
 
 export default function AcademiaLogin() {
-  const [correo, setCorreo] = useState('');
+  const [usuario, setUsuario] = useState(''); // <-- CAMBIADO A USUARIO
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -15,18 +15,16 @@ export default function AcademiaLogin() {
     setLoading(true);
 
     try {
-      // Buscamos al alumno en la tabla estudiantes
       const { data, error } = await supabase
         .from('estudiantes')
         .select('*')
-        .eq('correo', correo)
+        .eq('usuario', usuario) // <-- BUSCAMOS POR EL NUEVO CAMPO
         .eq('password', password)
         .single();
 
       if (error || !data) {
-        alert('Correo o contraseña incorrectos.');
+        alert('Usuario o contraseña incorrectos.');
       } else {
-        // Guardamos el ID del alumno en una cookie por 7 días
         document.cookie = `pache_alumno_id=${encodeURIComponent(data.id)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict`;
         router.push('/academia/dashboard');
       }
@@ -40,7 +38,7 @@ export default function AcademiaLogin() {
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-md bg-[#111] border border-cyan-500/30 rounded-[2rem] p-8 shadow-2xl shadow-cyan-900/20">
+      <div className="w-full max-w-md bg-[#111] border border-cyan-500/30 rounded-4xl p-8 shadow-2xl shadow-cyan-900/20">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-cyan-600 p-4 rounded-2xl mb-4 shadow-lg shadow-cyan-600/20">
             <AcademicCapIcon className="h-8 w-8 text-white" />
@@ -51,14 +49,14 @@ export default function AcademiaLogin() {
 
         <form onSubmit={handleLogin} className="space-y-4">
           <div>
-            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2 block mb-1">Correo Electrónico</label>
+            <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest ml-2 block mb-1">Usuario de Acceso</label>
             <input 
-              type="email" 
+              type="text" 
               required
-              value={correo}
-              onChange={(e) => setCorreo(e.target.value)}
+              value={usuario}
+              onChange={(e) => setUsuario(e.target.value)}
               className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none transition-all"
-              placeholder="alumno@correo.com"
+              placeholder="Ej: juanperez"
             />
           </div>
           <div>

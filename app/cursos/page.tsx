@@ -4,26 +4,35 @@ import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { 
   ArrowLeftIcon, AcademicCapIcon, PlusIcon, 
-  PencilIcon, CheckBadgeIcon, PhotoIcon, XMarkIcon
+  PencilIcon, CheckBadgeIcon, PhotoIcon, XMarkIcon,
+  UserGroupIcon, FolderOpenIcon,
+  ListBulletIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+
+interface Modulo {
+  modulo: string;
+  temas: string[];
+}
 
 interface Curso {
   id: string;
   nombre: string;
   ubicacion: string;
   fecha_curso: string;
+  temario: Modulo[];
 }
 
 interface Estudiante {
   id: string;
   nombre_completo: string;
-  correo: string;
+  usuario: string; // <-- CAMBIADO DE CORREO A USUARIO
   password?: string;
   curso_id: string;
   pago_completado: boolean;
   progreso: number;
   evidencias: string[];
+  temas_completados: string[]; 
 }
 
 export default function AdminCursosPage() {
@@ -31,21 +40,25 @@ export default function AdminCursosPage() {
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
   const [loading, setLoading] = useState(true);
   
+  const [vistaActiva, setVistaActiva] = useState<'Alumnos' | 'Cursos'>('Alumnos');
+
   const [modalVisible, setModalVisible] = useState<'ninguno' | 'curso' | 'alumno' | 'progreso'>('ninguno');
   const [alumnoEditando, setAlumnoEditando] = useState<Estudiante | null>(null);
+  const [cursoEditandoId, setCursoEditandoId] = useState<string | null>(null); 
   const [uploading, setUploading] = useState(false);
 
-  // Formularios
-  const [formCurso, setFormCurso] = useState({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '' });
-  const [formAlumno, setFormAlumno] = useState({ nombre_completo: '', correo: '', password: '', curso_id: '' });
+  const [formCurso, setFormCurso] = useState<{ nombre: string, ubicacion: string, fecha_curso: string, temario: { modulo: string, temasStr: string }[] }>({ 
+    nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] 
+  });
+  const [formAlumno, setFormAlumno] = useState({ nombre_completo: '', usuario: '', password: '', curso_id: '' }); // <-- CAMBIADO A USUARIO
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: dataCursos } = await supabase.from('cursos').select('*').order('fecha_curso', { ascending: false });
     const { data: dataEstudiantes } = await supabase.from('estudiantes').select('*').order('nombre_completo', { ascending: true });
     
-    if (dataCursos) setCursos(dataCursos);
-    if (dataEstudiantes) setEstudiantes(dataEstudiantes);
+    if (dataCursos) setCursos(dataCursos || []);
+    if (dataEstudiantes) setEstudiantes(dataEstudiantes || []);
     setLoading(false);
   }, []);
 
@@ -53,49 +66,105 @@ export default function AdminCursosPage() {
     fetchData();
   }, [fetchData]);
 
-  // Guardar Curso
   const handleGuardarCurso = async (e: React.FormEvent) => {
     e.preventDefault();
-    const { error } = await supabase.from('cursos').insert([formCurso]);
-    if (!error) {
-      setModalVisible('ninguno');
-      setFormCurso({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '' });
-      fetchData();
-    } else alert(error.message);
+    const temarioFormateado = formCurso.temario.map(m => ({
+      modulo: m.modulo,
+      temas: m.temasStr.split(',').map(t => t.trim()).filter(t => t !== '')
+    }));
+
+    const payload = {
+      nombre: formCurso.nombre,
+      ubicacion: formCurso.ubicacion,
+      fecha_curso: formCurso.fecha_curso,
+      temario: temarioFormateado
+    };
+
+    if (cursoEditandoId) {
+      const { error } = await supabase.from('cursos').update(payload).eq('id', cursoEditandoId);
+      if (!error) {
+        setModalVisible('ninguno');
+        setFormCurso({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] });
+        setCursoEditandoId(null);
+        fetchData();
+      } else alert(error.message);
+    } else {
+      const { error } = await supabase.from('cursos').insert([payload]);
+      if (!error) {
+        setModalVisible('ninguno');
+        setFormCurso({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] });
+        fetchData();
+      } else alert(error.message);
+    }
   };
 
-  // Guardar Alumno
+  const abrirEdicionCurso = (curso: Curso) => {
+    setCursoEditandoId(curso.id);
+    const temarioUI = (curso.temario || []).map(m => ({
+      modulo: m.modulo,
+      temasStr: m.temas.join(', ')
+    }));
+    setFormCurso({
+      nombre: curso.nombre,
+      ubicacion: curso.ubicacion,
+      fecha_curso: curso.fecha_curso,
+      temario: temarioUI
+    });
+    setModalVisible('curso');
+  };
+
   const handleGuardarAlumno = async (e: React.FormEvent) => {
     e.preventDefault();
     const { error } = await supabase.from('estudiantes').insert([{
       ...formAlumno,
       pago_completado: false,
       progreso: 0,
-      evidencias: []
+      evidencias: [],
+      temas_completados: [] 
     }]);
     if (!error) {
       setModalVisible('ninguno');
-      setFormAlumno({ nombre_completo: '', correo: '', password: '', curso_id: '' });
+      setFormAlumno({ nombre_completo: '', usuario: '', password: '', curso_id: '' });
+      setVistaActiva('Alumnos'); 
       fetchData();
     } else alert(error.message);
   };
 
-  // Actualizar Progreso y Pago
+  const handleToggleTema = (tema: string) => {
+    if (!alumnoEditando) return;
+    
+    const cursoAsignado = cursos.find(c => c.id === alumnoEditando.curso_id);
+    if (!cursoAsignado) return;
+
+    let nuevosTemas = [...(alumnoEditando.temas_completados || [])];
+    if (nuevosTemas.includes(tema)) {
+      nuevosTemas = nuevosTemas.filter(t => t !== tema);
+    } else {
+      nuevosTemas.push(tema);
+    }
+
+    const totalTemas = cursoAsignado.temario.reduce((acc, mod) => acc + mod.temas.length, 0);
+    const nuevoProgreso = totalTemas === 0 ? 0 : Math.round((nuevosTemas.length / totalTemas) * 100);
+
+    setAlumnoEditando({ ...alumnoEditando, temas_completados: nuevosTemas, progreso: nuevoProgreso });
+  };
+
   const handleActualizarProgreso = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!alumnoEditando) return;
     const { error } = await supabase.from('estudiantes').update({
       progreso: alumnoEditando.progreso,
-      pago_completado: alumnoEditando.pago_completado
+      pago_completado: alumnoEditando.pago_completado,
+      temas_completados: alumnoEditando.temas_completados 
     }).eq('id', alumnoEditando.id);
 
     if (!error) {
       setModalVisible('ninguno');
       fetchData();
+      alert("Progreso del alumno guardado con éxito.");
     } else alert(error.message);
   };
 
-  // Subir Evidencia
   const handleUploadEvidencia = async (e: React.ChangeEvent<HTMLInputElement>) => {
     if (!e.target.files || e.target.files.length === 0 || !alumnoEditando) return;
     try {
@@ -104,13 +173,10 @@ export default function AdminCursosPage() {
       const fileExt = file.name.split('.').pop();
       const fileName = `academia/${Date.now()}-${Math.floor(Math.random() * 1000)}.${fileExt}`;
 
-      // Usamos el mismo bucket 'disenos' pero en una subcarpeta
       const { error: uploadError } = await supabase.storage.from('disenos').upload(fileName, file);
       if (uploadError) throw uploadError;
 
       const { data: { publicUrl } } = supabase.storage.from('disenos').getPublicUrl(fileName);
-
-      // Agregamos la URL al array de evidencias del alumno
       const nuevasEvidencias = [...(alumnoEditando.evidencias || []), publicUrl];
       
       const { error: updateError } = await supabase.from('estudiantes').update({ evidencias: nuevasEvidencias }).eq('id', alumnoEditando.id);
@@ -131,6 +197,7 @@ export default function AdminCursosPage() {
   };
 
   const getNombreCurso = (id: string) => cursos.find(c => c.id === id)?.nombre || 'Curso Desconocido';
+  const getCursoObj = (id: string) => cursos.find(c => c.id === id) || null;
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8 relative">
@@ -153,7 +220,7 @@ export default function AdminCursosPage() {
         </div>
         
         <div className="flex gap-3 w-full md:w-auto">
-          <button onClick={() => setModalVisible('curso')} className="flex-1 md:flex-none bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-xl font-bold transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+          <button onClick={() => { setCursoEditandoId(null); setFormCurso({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] }); setModalVisible('curso'); }} className="flex-1 md:flex-none bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-xl font-bold transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2">
             <PlusIcon className="h-4 w-4" /> Nuevo Curso
           </button>
           <button onClick={() => setModalVisible('alumno')} className="flex-1 md:flex-none bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-cyan-600/20 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
@@ -162,75 +229,129 @@ export default function AdminCursosPage() {
         </div>
       </header>
 
-      {/* LISTA DE ALUMNOS */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6">
-        {estudiantes.map(alumno => (
-          <div key={alumno.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
-            <div className="absolute top-4 right-4 z-10">
-              <button 
-                onClick={() => { setAlumnoEditando(alumno); setModalVisible('progreso'); }}
-                className="bg-black/60 p-2 rounded-xl border border-gray-700 hover:text-cyan-400 transition-colors"
-                title="Gestionar Progreso y Fotos"
-              >
-                <PencilIcon className="h-4 w-4" />
-              </button>
-            </div>
-
-            <div className="mb-4 pr-10">
-              <h3 className="text-xl font-black uppercase italic truncate">{alumno.nombre_completo}</h3>
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">{alumno.correo}</p>
-            </div>
-
-            <div className="bg-black border border-gray-800 rounded-2xl p-4 mb-4">
-              <p className="text-[9px] text-cyan-500 font-black uppercase tracking-widest mb-1">Curso Asignado</p>
-              <p className="text-sm font-bold truncate">{getNombreCurso(alumno.curso_id)}</p>
-            </div>
-
-            <div className="space-y-4">
-              <div>
-                <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">
-                  <span>Progreso</span>
-                  <span className={alumno.progreso === 100 ? 'text-green-400' : 'text-cyan-400'}>{alumno.progreso}%</span>
-                </div>
-                <div className="w-full h-2 bg-gray-900 rounded-full overflow-hidden">
-                  <div className={`h-full ${alumno.progreso === 100 ? 'bg-green-500' : 'bg-cyan-500'}`} style={{ width: `${alumno.progreso}%` }}></div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between border-t border-gray-800/50 pt-4">
-                <div className="flex items-center gap-2">
-                  <CheckBadgeIcon className={`h-5 w-5 ${alumno.pago_completado ? 'text-green-500' : 'text-gray-700'}`} />
-                  <span className={`text-[10px] font-black uppercase tracking-widest ${alumno.pago_completado ? 'text-green-400' : 'text-gray-500'}`}>
-                    {alumno.pago_completado ? 'Pagado' : 'Pendiente'}
-                  </span>
-                </div>
-                <div className="flex items-center gap-1 text-[10px] font-black text-gray-500">
-                  <PhotoIcon className="h-4 w-4" /> {alumno.evidencias?.length || 0} Fotos
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-        {estudiantes.length === 0 && !loading && (
-          <div className="col-span-full text-center py-20 text-gray-600 font-black uppercase tracking-widest italic border border-dashed border-gray-800 rounded-3xl">
-            Aún no hay alumnos registrados
-          </div>
-        )}
+      <div className="flex bg-[#111] p-1.5 rounded-2xl w-full max-w-md mb-8 border border-gray-800/50 mx-auto sm:mx-0">
+        <button 
+          onClick={() => setVistaActiva('Alumnos')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${vistaActiva === 'Alumnos' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <UserGroupIcon className="h-4 w-4" /> Alumnos
+        </button>
+        <button 
+          onClick={() => setVistaActiva('Cursos')}
+          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${vistaActiva === 'Cursos' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-500 hover:text-gray-300'}`}
+        >
+          <FolderOpenIcon className="h-4 w-4" /> Lista de Cursos
+        </button>
       </div>
 
-      {/* MODALES REUTILIZABLES */}
+      {vistaActiva === 'Alumnos' && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
+          {estudiantes.map(alumno => (
+            <div key={alumno.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
+              <div className="absolute top-4 right-4 z-10">
+                <button 
+                  onClick={() => { setAlumnoEditando(alumno); setModalVisible('progreso'); }}
+                  className="bg-black p-3 rounded-xl border border-gray-700 hover:border-cyan-500 hover:text-cyan-400 transition-colors shadow-lg"
+                  title="Gestionar Progreso, Temas y Fotos"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mb-4 pr-12">
+                <h3 className="text-xl font-black uppercase italic truncate">{alumno.nombre_completo}</h3>
+                <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">User: {alumno.usuario}</p>
+              </div>
+
+              <div className="bg-black border border-gray-800 rounded-2xl p-4 mb-4">
+                <p className="text-[9px] text-cyan-500 font-black uppercase tracking-widest mb-1">Curso Asignado</p>
+                <p className="text-sm font-bold truncate">{getNombreCurso(alumno.curso_id)}</p>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-widest text-gray-400 mb-2">
+                    <span>Progreso General</span>
+                    <span className={alumno.progreso === 100 ? 'text-green-400' : 'text-cyan-400'}>{alumno.progreso}%</span>
+                  </div>
+                  <div className="w-full h-2 bg-gray-900 rounded-full overflow-hidden">
+                    <div className={`h-full ${alumno.progreso === 100 ? 'bg-green-500' : 'bg-cyan-500'}`} style={{ width: `${alumno.progreso}%` }}></div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between border-t border-gray-800/50 pt-4">
+                  <div className="flex items-center gap-2">
+                    <CheckBadgeIcon className={`h-5 w-5 ${alumno.pago_completado ? 'text-green-500' : 'text-gray-700'}`} />
+                    <span className={`text-[10px] font-black uppercase tracking-widest ${alumno.pago_completado ? 'text-green-400' : 'text-gray-500'}`}>
+                      {alumno.pago_completado ? 'Pagado' : 'Pendiente'}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1 text-[10px] font-black text-gray-500">
+                    <PhotoIcon className="h-4 w-4" /> {alumno.evidencias?.length || 0} Fotos
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+          {estudiantes.length === 0 && !loading && (
+            <div className="col-span-full text-center py-20 text-gray-600 font-black uppercase tracking-widest italic border border-dashed border-gray-800 rounded-3xl">
+              Aún no hay alumnos registrados
+            </div>
+          )}
+        </div>
+      )}
+
+      {vistaActiva === 'Cursos' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+          {cursos.map(curso => (
+            <div key={curso.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group hover:border-purple-500/40 transition-all flex flex-col">
+              <div className="absolute top-4 right-4 z-10">
+                <button 
+                  onClick={() => abrirEdicionCurso(curso)}
+                  className="bg-black p-2 rounded-xl border border-gray-700 hover:border-purple-500 hover:text-purple-400 transition-colors shadow-lg"
+                  title="Editar Curso"
+                >
+                  <PencilIcon className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="mb-4 pr-10">
+                <h3 className="text-xl font-black uppercase italic text-purple-400">{curso.nombre}</h3>
+                <p className="text-[10px] text-gray-500 uppercase font-black mt-1">{curso.temario?.length || 0} Módulos Registrados</p>
+              </div>
+
+              <div className="mt-auto space-y-2 bg-black border border-gray-800 p-4 rounded-2xl">
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                  <span className="text-gray-500">Ubicación:</span>
+                  <span className="text-gray-300">{curso.ubicacion}</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest">
+                  <span className="text-gray-500">Fecha:</span>
+                  <span className="text-gray-300">{curso.fecha_curso}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {cursos.length === 0 && !loading && (
+            <div className="col-span-full text-center py-20 text-gray-600 font-black uppercase tracking-widest italic border border-dashed border-gray-800 rounded-3xl">
+              Aún no hay cursos creados
+            </div>
+          )}
+        </div>
+      )}
+
       {modalVisible !== 'ninguno' && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-lg rounded-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-[#111] border border-cyan-500/30 w-full max-w-lg rounded-t-4xl sm:rounded-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
               <h2 className="text-lg font-black text-cyan-400 uppercase italic">
-                {modalVisible === 'curso' ? 'Crear Nuevo Curso' : modalVisible === 'alumno' ? 'Registrar Alumno' : 'Gestionar Progreso'}
+                {modalVisible === 'curso' ? (cursoEditandoId ? 'Editar Curso' : 'Crear Nuevo Curso') : modalVisible === 'alumno' ? 'Registrar Alumno' : 'Gestionar Avance'}
               </h2>
               <button onClick={() => setModalVisible('ninguno')}><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
 
             <div className="overflow-y-auto p-6 md:p-8">
-              {/* MODAL: NUEVO CURSO */}
+              
               {modalVisible === 'curso' && (
                 <form onSubmit={handleGuardarCurso} className="space-y-4">
                   <div>
@@ -245,6 +366,63 @@ export default function AdminCursosPage() {
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Fecha del Curso</label>
                     <input required value={formCurso.fecha_curso} onChange={e => setFormCurso({...formCurso, fecha_curso: e.target.value})} type="date" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
                   </div>
+
+                  <div className="border-t border-gray-800 pt-4 mt-4">
+                    <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest flex justify-between items-center mb-4">
+                      <span>Temario / Módulos</span>
+                      <button 
+                        type="button" 
+                        onClick={() => setFormCurso({...formCurso, temario: [...formCurso.temario, { modulo: '', temasStr: '' }]})}
+                        className="bg-gray-800 text-white px-2 py-1 rounded-md text-[9px] hover:bg-gray-700 flex items-center gap-1"
+                      >
+                        <PlusIcon className="h-3 w-3" /> Añadir Módulo
+                      </button>
+                    </label>
+                    
+                    <div className="space-y-4">
+                      {formCurso.temario.map((mod, index) => (
+                        <div key={index} className="bg-black border border-gray-800 p-4 rounded-xl relative">
+                          <button 
+                            type="button" 
+                            onClick={() => {
+                              const nuevoTemario = [...formCurso.temario];
+                              nuevoTemario.splice(index, 1);
+                              setFormCurso({...formCurso, temario: nuevoTemario});
+                            }}
+                            className="absolute top-2 right-2 text-gray-600 hover:text-red-500"
+                          >
+                            <XMarkIcon className="h-4 w-4" />
+                          </button>
+                          <input 
+                            required 
+                            placeholder="Nombre del Módulo (Ej: Módulo 1)" 
+                            value={mod.modulo}
+                            onChange={(e) => {
+                              const nuevoTemario = [...formCurso.temario];
+                              nuevoTemario[index].modulo = e.target.value;
+                              setFormCurso({...formCurso, temario: nuevoTemario});
+                            }}
+                            className="w-full bg-transparent border-b border-gray-800 mb-3 pb-2 outline-none text-xs font-bold text-white focus:border-cyan-500" 
+                          />
+                          <textarea 
+                            required 
+                            placeholder="Escribe los temas separados por coma (Ej: Bienvenida, Router, Vectores)" 
+                            value={mod.temasStr}
+                            onChange={(e) => {
+                              const nuevoTemario = [...formCurso.temario];
+                              nuevoTemario[index].temasStr = e.target.value;
+                              setFormCurso({...formCurso, temario: nuevoTemario});
+                            }}
+                            className="w-full bg-transparent outline-none text-[11px] text-gray-400 min-h-10 resize-none" 
+                          />
+                        </div>
+                      ))}
+                      {formCurso.temario.length === 0 && (
+                        <p className="text-[10px] text-gray-600 italic text-center">No has agregado módulos. Haz clic en &quot;Añadir Módulo&quot;.</p>
+                      )}
+                    </div>
+                  </div>
+
                   <button className="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest mt-4">Guardar Curso</button>
                 </form>
               )}
@@ -254,15 +432,15 @@ export default function AdminCursosPage() {
                 <form onSubmit={handleGuardarAlumno} className="space-y-4">
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Nombre Completo</label>
-                    <input required value={formAlumno.nombre_completo} onChange={e => setFormAlumno({...formAlumno, nombre_completo: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
+                    <input required value={formAlumno.nombre_completo} onChange={e => setFormAlumno({...formAlumno, nombre_completo: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" placeholder="Juan Pérez" />
                   </div>
                   <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Correo (Usuario de Acceso)</label>
-                    <input required value={formAlumno.correo} onChange={e => setFormAlumno({...formAlumno, correo: e.target.value})} type="email" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Nombre de Usuario (Login)</label>
+                    <input required value={formAlumno.usuario} onChange={e => setFormAlumno({...formAlumno, usuario: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" placeholder="Ej: juanperez" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Contraseña</label>
-                    <input required value={formAlumno.password} onChange={e => setFormAlumno({...formAlumno, password: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
+                    <input required value={formAlumno.password} onChange={e => setFormAlumno({...formAlumno, password: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" placeholder="Secreta123" />
                   </div>
                   <div>
                     <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Asignar a Curso</label>
@@ -275,19 +453,51 @@ export default function AdminCursosPage() {
                 </form>
               )}
 
-              {/* MODAL: GESTIONAR PROGRESO */}
+              {/* MODAL: GESTIONAR PROGRESO CON CHECKBOXES */}
               {modalVisible === 'progreso' && alumnoEditando && (
                 <form onSubmit={handleActualizarProgreso} className="space-y-6">
+                  
                   <div>
-                    <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest block mb-4">
-                      Porcentaje de Progreso: {alumnoEditando.progreso}%
+                    <div className="flex justify-between items-center mb-2">
+                      <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">
+                        Progreso Calculado
+                      </label>
+                      <span className="text-lg font-black text-white">{alumnoEditando.progreso}%</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-900 rounded-full overflow-hidden">
+                      <div className="h-full bg-cyan-500 transition-all duration-500" style={{ width: `${alumnoEditando.progreso}%` }}></div>
+                    </div>
+                  </div>
+
+                  <div className="bg-black/50 p-4 rounded-2xl border border-gray-800 max-h-60 overflow-y-auto space-y-4">
+                    <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-3">
+                      <ListBulletIcon className="h-4 w-4" /> Temario del Curso
                     </label>
-                    <input 
-                      type="range" min="0" max="100" step="5"
-                      value={alumnoEditando.progreso} 
-                      onChange={e => setAlumnoEditando({...alumnoEditando, progreso: Number(e.target.value)})} 
-                      className="w-full accent-cyan-500"
-                    />
+                    
+                    {getCursoObj(alumnoEditando.curso_id)?.temario?.map((mod, i) => (
+                      <div key={i}>
+                        <h4 className="text-xs font-bold text-cyan-500 uppercase italic mb-2">{mod.modulo}</h4>
+                        <div className="space-y-2 pl-2">
+                          {mod.temas.map((tema, j) => (
+                            <label key={j} className="flex items-center gap-3 cursor-pointer group">
+                              <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${alumnoEditando.temas_completados?.includes(tema) ? 'bg-cyan-600 border-cyan-600' : 'border-gray-600 group-hover:border-cyan-500'}`}>
+                                {alumnoEditando.temas_completados?.includes(tema) && <CheckBadgeIcon className="w-3 h-3 text-white" />}
+                              </div>
+                              <input 
+                                type="checkbox" 
+                                className="hidden" 
+                                checked={alumnoEditando.temas_completados?.includes(tema) || false}
+                                onChange={() => handleToggleTema(tema)}
+                              />
+                              <span className={`text-xs ${alumnoEditando.temas_completados?.includes(tema) ? 'text-gray-300 line-through opacity-70' : 'text-gray-100'}`}>{tema}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {!getCursoObj(alumnoEditando.curso_id)?.temario?.length && (
+                      <p className="text-[10px] text-gray-600 italic">El curso asignado no tiene un temario registrado.</p>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-4 bg-black border border-gray-800 p-4 rounded-2xl cursor-pointer" onClick={() => setAlumnoEditando({...alumnoEditando, pago_completado: !alumnoEditando.pago_completado})}>
@@ -308,7 +518,6 @@ export default function AdminCursosPage() {
                       <input type="file" accept="image/*" onChange={handleUploadEvidencia} disabled={uploading} className="hidden" />
                     </label>
 
-                    {/* Mini galería de evidencias subidas */}
                     {alumnoEditando.evidencias && alumnoEditando.evidencias.length > 0 && (
                       <div className="grid grid-cols-4 gap-2 mt-4">
                         {alumnoEditando.evidencias.map((url, i) => (
@@ -320,7 +529,7 @@ export default function AdminCursosPage() {
                     )}
                   </div>
 
-                  <button className="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest shadow-lg">Guardar Cambios</button>
+                  <button className="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest shadow-lg active:scale-95 transition-all">Guardar Cambios</button>
                 </form>
               )}
             </div>
