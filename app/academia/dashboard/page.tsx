@@ -13,6 +13,24 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
+// 1. SOLUCIÓN: Le decimos a TypeScript exactamente cómo es el objeto jsPDF
+type JsPDFInstancia = {
+  setFillColor: (r: number, g: number, b: number) => void;
+  rect: (x: number, y: number, w: number, h: number, style: string) => void;
+  setTextColor: (r: number, g: number, b: number) => void;
+  setFontSize: (size: number) => void;
+  text: (text: string, x: number, y: number, options?: Record<string, string>) => void;
+  setFont: (fontName: string, fontStyle: string) => void;
+  save: (filename: string) => void;
+};
+
+// 2. SOLUCIÓN: Extendemos la interfaz de Window sin usar "any"
+interface CustomWindow extends Window {
+  jspdf?: {
+    jsPDF: new (options?: Record<string, unknown>) => JsPDFInstancia;
+  };
+}
+
 interface Tema {
   titulo: string;
   material_url?: string;
@@ -46,6 +64,7 @@ export default function AcademiaDashboard() {
   const [alumno, setAlumno] = useState<Alumno | null>(null);
   const [curso, setCurso] = useState<Curso | null>(null);
   const [loading, setLoading] = useState(true);
+  const [generandoPDF, setGenerandoPDF] = useState(false);
   const router = useRouter();
 
   const handleLogout = useCallback(() => {
@@ -94,41 +113,64 @@ export default function AcademiaDashboard() {
     fetchDatosAlumno();
   }, [fetchDatosAlumno]);
 
-  // CORRECCIÓN PARA VERCEL: Importación dinámica de jsPDF
   const generarCertificadoPDF = async () => {
     if (!alumno || !curso) return;
+    setGenerandoPDF(true);
 
-    // Solo carga la librería cuando el alumno hace clic
-    const { jsPDF } = await import('jspdf');
+    try {
+      // Usamos CustomWindow para evitar errores de tipado
+      const win = window as unknown as CustomWindow;
 
-    const doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1280, 720] });
+      if (!win.jspdf) {
+        await new Promise<void>((resolve, reject) => {
+          const script = document.createElement('script');
+          script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js';
+          script.onload = () => resolve();
+          script.onerror = () => reject(new Error("No se pudo cargar el creador de PDF"));
+          document.head.appendChild(script);
+        });
+      }
 
-    doc.setFillColor(15, 15, 15);
-    doc.rect(0, 0, 1280, 720, 'F');
-    
-    doc.setTextColor(0, 255, 255); 
-    doc.setFontSize(50);
-    doc.text("CERTIFICADO DE CAPACITACIÓN", 640, 200, { align: 'center' });
+      // Volvemos a leer la ventana ya con el script cargado
+      const loadedWin = window as unknown as CustomWindow;
+      
+      if (loadedWin.jspdf) {
+        const jsPDF = loadedWin.jspdf.jsPDF;
+        const doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1280, 720] });
 
-    doc.setTextColor(255, 255, 255); 
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(60);
-    doc.text(alumno.nombre_completo.toUpperCase(), 640, 350, { align: 'center' });
+        doc.setFillColor(15, 15, 15);
+        doc.rect(0, 0, 1280, 720, 'F');
+        
+        doc.setTextColor(0, 255, 255); 
+        doc.setFontSize(50);
+        doc.text("CERTIFICADO DE CAPACITACIÓN", 640, 200, { align: 'center' });
 
-    doc.setTextColor(150, 150, 150); 
-    doc.setFontSize(24);
-    doc.text(`Por haber concluido satisfactoriamente el curso:`, 640, 420, { align: 'center' });
-    
-    doc.setTextColor(200, 150, 255); 
-    doc.setFontSize(35);
-    doc.text(`"${curso.nombre}"`, 640, 470, { align: 'center' });
+        doc.setTextColor(255, 255, 255); 
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(60);
+        doc.text(alumno.nombre_completo.toUpperCase(), 640, 350, { align: 'center' });
 
-    doc.setTextColor(150, 150, 150);
-    doc.setFontSize(20);
-    const fechaFormat = new Date(curso.fecha_curso).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
-    doc.text(`Impartido en ${curso.ubicacion} el ${fechaFormat}`, 640, 520, { align: 'center' });
+        doc.setTextColor(150, 150, 150); 
+        doc.setFontSize(24);
+        doc.text(`Por haber concluido satisfactoriamente el curso:`, 640, 420, { align: 'center' });
+        
+        doc.setTextColor(200, 150, 255); 
+        doc.setFontSize(35);
+        doc.text(`"${curso.nombre}"`, 640, 470, { align: 'center' });
 
-    doc.save(`Constancia_${alumno.nombre_completo.replace(/\s+/g, '_')}.pdf`);
+        doc.setTextColor(150, 150, 150);
+        doc.setFontSize(20);
+        const fechaFormat = new Date(curso.fecha_curso).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
+        doc.text(`Impartido en ${curso.ubicacion} el ${fechaFormat}`, 640, 520, { align: 'center' });
+
+        doc.save(`Constancia_${alumno.nombre_completo.replace(/\s+/g, '_')}.pdf`);
+      }
+    } catch (error) {
+      console.error(error);
+      alert("Hubo un problema al generar tu certificado. Intenta de nuevo.");
+    } finally {
+      setGenerandoPDF(false);
+    }
   };
 
   const getModuloActual = () => {
@@ -187,7 +229,6 @@ export default function AcademiaDashboard() {
               </div>
             </div>
 
-            {/* MÓDULO ACTUAL CON LINKS DE MATERIALES */}
             {moduloActual && (
               <div className="mb-6 bg-black border border-gray-800 rounded-2xl p-4">
                 <div className="flex items-center gap-2 text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-3 border-b border-gray-800 pb-2">
@@ -207,7 +248,6 @@ export default function AcademiaDashboard() {
                           </div>
                           <span className={`text-xs ${completado ? 'text-gray-500 line-through' : 'text-white font-medium'}`}>{titulo}</span>
                         </div>
-                        {/* BOTÓN DE MATERIAL DE APOYO */}
                         {material && !completado && (
                           <a 
                             href={material} 
@@ -252,10 +292,10 @@ export default function AcademiaDashboard() {
               </div>
               <button 
                 onClick={generarCertificadoPDF}
-                disabled={!puedeDescargar}
+                disabled={!puedeDescargar || generandoPDF}
                 className="w-full py-4 rounded-xl text-xs font-black uppercase tracking-widest transition-all disabled:opacity-50 disabled:cursor-not-allowed bg-cyan-600 hover:bg-cyan-500 text-white shadow-lg shadow-cyan-900/20 mt-2"
               >
-                Descargar PDF
+                {generandoPDF ? 'PREPARANDO PDF...' : 'Descargar PDF'}
               </button>
             </div>
           </div>
