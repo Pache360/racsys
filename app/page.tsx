@@ -1,13 +1,13 @@
 'use client';
-import { useState, useEffect } from 'react';
-import Link from 'next/navigation'; // Corregido: para Next.js 13+ se usa navigation o Link de 'next/link'
+import { useState, useEffect, useCallback } from 'react';
 import NextLink from 'next/link';
 import { useRouter } from 'next/navigation'; 
 import { supabase } from '@/lib/supabase';
 import { 
   CameraIcon, VideoCameraIcon, PlusIcon, PlayIcon, 
   ChatBubbleLeftRightIcon, CalendarIcon, XMarkIcon,
-  UserGroupIcon, ArrowRightOnRectangleIcon 
+  UserGroupIcon, ArrowRightOnRectangleIcon,
+  AcademicCapIcon
 } from '@heroicons/react/24/outline';
 
 const ESTADOS_PROYECTO = {
@@ -15,6 +15,42 @@ const ESTADOS_PROYECTO = {
   Video: ['Cotización', 'Planeación', 'Tomas', 'Edición', 'Autorizado', 'Entrega', 'Finalizado'],
   Posts: ['Parrilla', 'Diseño', 'Cambios', 'Autorizado', 'Programado', 'Publicado']
 };
+
+// Interfaz para los datos crudos que vienen de la Base de Datos
+interface Proyecto {
+  id: string;
+  titulo: string;
+  cliente: string;
+  categoria: keyof typeof ESTADOS_PROYECTO;
+  estado: string;
+  fecha_entrega: string;
+  logo_url: string;
+  descripcion: string;
+  fecha_tomas: string;
+  ubicacion: string;
+  prioridad: string;
+  notas_cliente: string;
+}
+
+// NUEVA Interfaz: Para los datos mapeados que usamos en la vista (Dashboard)
+interface ProyectoUI {
+  id: string;
+  nombre: string;
+  cliente: string;
+  tipo: string;
+  entrega: string;
+  prioridad: string;
+  estado: string;
+  descripcion: string;
+  fecha_tomas: string;
+  ubicacion: string;
+}
+
+interface Cliente {
+  id: string;
+  nombre: string;
+  dueno_id: string;
+}
 
 export default function Home() {
   const router = useRouter();
@@ -24,9 +60,10 @@ export default function Home() {
   const [loading, setLoading] = useState(false);
   const [estadoProyecto, setEstadoProyecto] = useState<string>(''); 
 
-  const [proyectosDB, setProyectosDB] = useState<any[]>([]);
-  const [listaClientesDB, setListaClientesDB] = useState<any[]>([]); 
-  const [conteos, setConteos] = useState({ fotos: 0, videos: 0, youtube: 0, posts: 0 });
+  // CORRECCIÓN: Sustituimos any[] por las interfaces correctas
+  const [proyectosDB, setProyectosDB] = useState<ProyectoUI[]>([]);
+  const [listaClientesDB, setListaClientesDB] = useState<Cliente[]>([]); 
+  const [conteos, setConteos] = useState({ fotos: 0, videos: 0, youtube: 0, posts: 0, cursos: 0 });
 
   const [formData, setFormData] = useState({
     titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal',
@@ -38,7 +75,7 @@ export default function Home() {
     router.push('/login');
   };
 
-  const fetchDatos = async () => {
+  const fetchDatos = useCallback(async () => {
     const { data: proyData } = await supabase
       .from('proyectos')
       .select('*')
@@ -48,15 +85,20 @@ export default function Home() {
       .from('clientes')
       .select('*')
       .order('nombre', { ascending: true });
+      
+    const { data: cursosData } = await supabase
+      .from('cursos')
+      .select('id');
 
     if (proyData && clientData) {
       const nombresMarcas = clientData
-        .filter(c => c.dueno_id && c.dueno_id !== '')
-        .map(c => c.nombre);
+        .filter((c: Cliente) => c.dueno_id && c.dueno_id !== '')
+        .map((c: Cliente) => c.nombre);
 
-      const proyectosSoloMarcas = proyData.filter(p => nombresMarcas.includes(p.cliente));
+      const proyectosSoloMarcas = proyData.filter((p: Proyecto) => nombresMarcas.includes(p.cliente));
 
-      const formateados = proyectosSoloMarcas.map(p => ({
+      // Mapeamos los datos y encajan perfectamente con ProyectoUI
+      const formateados: ProyectoUI[] = proyectosSoloMarcas.map((p: Proyecto) => ({
         id: p.id,
         nombre: p.titulo,
         cliente: p.cliente,
@@ -68,28 +110,34 @@ export default function Home() {
         fecha_tomas: p.fecha_tomas || '',
         ubicacion: p.ubicacion || ''
       }));
+      
       setProyectosDB(formateados);
 
       setConteos({
-        fotos: proyectosSoloMarcas.filter(p => p.categoria === 'Fotografía').length,
-        videos: proyectosSoloMarcas.filter(p => p.categoria === 'Video').length,
+        fotos: proyectosSoloMarcas.filter((p: Proyecto) => p.categoria === 'Fotografía').length,
+        videos: proyectosSoloMarcas.filter((p: Proyecto) => p.categoria === 'Video').length,
         youtube: 0, 
-        posts: proyectosSoloMarcas.filter(p => p.categoria === 'Posts').length,
+        posts: proyectosSoloMarcas.filter((p: Proyecto) => p.categoria === 'Posts').length,
+        cursos: cursosData ? cursosData.length : 0 
       });
     }
 
     if (clientData) {
-      const soloMarcasParaSelector = clientData.filter(c => c.dueno_id && c.dueno_id !== '');
+      const soloMarcasParaSelector = clientData.filter((c: Cliente) => c.dueno_id && c.dueno_id !== '');
       setListaClientesDB(soloMarcasParaSelector);
     }
-  };
-
-  useEffect(() => {
-    fetchDatos();
   }, []);
 
-  // --- LÓGICA DE EDICIÓN MEJORADA ---
-  const abrirEdicion = (proy: any) => {
+  // CORRECCIÓN: Envolvemos la llamada en una función interna para evitar advertencias de React
+  useEffect(() => {
+    const inicializarDatos = async () => {
+      await fetchDatos();
+    };
+    inicializarDatos();
+  }, [fetchDatos]);
+
+  // CORRECCIÓN: Agregamos el tipo ProyectoUI a 'proy' en lugar de any
+  const abrirEdicion = (proy: ProyectoUI) => {
     setIdEditando(proy.id);
     setCategoria(proy.tipo as keyof typeof ESTADOS_PROYECTO);
     setEstadoProyecto(proy.estado);
@@ -107,11 +155,9 @@ export default function Home() {
     setIsModalOpen(true);
   };
 
-  useEffect(() => {
-    if (isModalOpen && !idEditando) {
-      setEstadoProyecto(ESTADOS_PROYECTO[categoria][0]);
-    }
-  }, [categoria, isModalOpen, idEditando]);
+  const handleCambioEstado = (e: React.ChangeEvent<HTMLSelectElement>) => {
+      setEstadoProyecto(e.target.value);
+  }
 
   const getPrioridadColor = (prio: string) => {
     switch (prio) {
@@ -133,7 +179,7 @@ export default function Home() {
 
   const handleSave = async () => {
     setLoading(true);
-    let nombreClienteFinal = formData.prioridad === 'Cliente Nuevo' ? formData.nuevoClienteNombre : formData.cliente;
+    const nombreClienteFinal = formData.prioridad === 'Cliente Nuevo' ? formData.nuevoClienteNombre : formData.cliente;
 
     if (formData.prioridad === 'Cliente Nuevo' && !idEditando) {
       await supabase.from('clientes').insert([
@@ -147,12 +193,12 @@ export default function Home() {
       ]);
     }
 
-    // CORRECCIÓN DE FECHA: Evita el desfase de un día
     const corregirFecha = (fechaStr: string) => {
       if (!fechaStr) return null;
-      // Esto asegura que la fecha se guarde tal cual se seleccionó en el input
       return fechaStr;
     };
+
+    const estadoGuardar = estadoProyecto || ESTADOS_PROYECTO[categoria][0];
 
     const dataProyecto = { 
       titulo: formData.titulo,
@@ -163,7 +209,7 @@ export default function Home() {
       fecha_tomas: corregirFecha(formData.fecha_tomas),
       ubicacion: formData.ubicacion,
       prioridad: formData.prioridad,
-      estado: estadoProyecto
+      estado: estadoGuardar
     };
 
     if (idEditando) {
@@ -176,6 +222,7 @@ export default function Home() {
 
     setIsModalOpen(false);
     setIdEditando(null);
+    setEstadoProyecto(''); 
     setFormData({
       titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal',
       nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''
@@ -205,13 +252,13 @@ export default function Home() {
           <NextLink href="/clients" className="flex items-center justify-center gap-2 bg-cyan-900/20 hover:bg-cyan-900/40 text-cyan-400 border border-cyan-500/30 px-6 py-3 rounded-xl font-bold transition-all active:scale-95 text-sm italic uppercase tracking-tight w-full sm:w-auto">
             <UserGroupIcon className="h-5 w-5" /> Clientes
           </NextLink>
-          <button onClick={() => { setIdEditando(null); setFormData({titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal', nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''}); setIsModalOpen(true); }} className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/20 active:scale-95 text-sm w-full sm:w-auto">
+          <button onClick={() => { setIdEditando(null); setEstadoProyecto(''); setFormData({titulo: '', cliente: '', descripcion: '', fecha_inicio: '', fecha_entrega: '', fecha_tomas: '', ubicacion: '', prioridad: 'Normal', nuevoClienteNombre: '', nuevoClienteContacto: '', nuevoClienteCorreo: '', nuevoClienteLogo: ''}); setIsModalOpen(true); }} className="flex items-center justify-center gap-2 bg-purple-600 hover:bg-purple-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-purple-500/20 active:scale-95 text-sm w-full sm:w-auto">
             <PlusIcon className="h-5 w-5" /> NUEVO PROYECTO
           </button>
         </div>
       </header>
 
-      <section className="grid grid-cols-2 md:grid-cols-4 gap-4 md:gap-6 mb-12">
+      <section className="grid grid-cols-2 md:grid-cols-5 gap-4 md:gap-6 mb-12">
         <NextLink href="/fotos" className="group bg-[#111] border border-purple-500/10 p-4 md:p-6 rounded-3xl hover:border-purple-500/60 transition-all shadow-xl">
           <CameraIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
           <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Fotografía</h3>
@@ -231,6 +278,11 @@ export default function Home() {
           <ChatBubbleLeftRightIcon className="h-6 w-6 md:h-8 md:w-8 text-purple-400 mb-2 md:mb-4" />
           <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Posts</h3>
           <p className="text-2xl md:text-4xl font-black mt-1 md:mt-2 group-hover:text-purple-300">{conteos.posts}</p>
+        </NextLink>
+        <NextLink href="/cursos" className="group bg-[#111] border border-cyan-500/10 p-4 md:p-6 rounded-3xl hover:border-cyan-500/60 transition-all shadow-xl">
+          <AcademicCapIcon className="h-6 w-6 md:h-8 md:w-8 text-cyan-400 mb-2 md:mb-4" />
+          <h3 className="text-gray-400 text-[10px] md:text-xs font-bold uppercase tracking-widest">Academia</h3>
+          <p className="text-2xl md:text-4xl font-black mt-1 md:mt-2 group-hover:text-cyan-300">{conteos.cursos}</p>
         </NextLink>
       </section>
       
@@ -298,7 +350,7 @@ export default function Home() {
 
               <div className="md:col-span-2 space-y-1 animate-in fade-in slide-in-from-top-2 duration-300">
                 <label className="text-[10px] font-bold text-purple-400 uppercase tracking-widest">Estado de Producción ({categoria})</label>
-                <select required value={estadoProyecto} onChange={(e) => setEstadoProyecto(e.target.value)} className="w-full bg-[#0a0a0a] border border-purple-900 rounded-xl p-3 focus:border-purple-500 outline-none text-sm font-bold text-white">
+                <select required value={estadoProyecto || ESTADOS_PROYECTO[categoria][0]} onChange={handleCambioEstado} className="w-full bg-[#0a0a0a] border border-purple-900 rounded-xl p-3 focus:border-purple-500 outline-none text-sm font-bold text-white">
                   {ESTADOS_PROYECTO[categoria].map(est => (<option key={est} value={est}>{est}</option>))}
                 </select>
               </div>
