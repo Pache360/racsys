@@ -6,13 +6,18 @@ import {
   ArrowLeftIcon, AcademicCapIcon, PlusIcon, 
   PencilIcon, CheckBadgeIcon, PhotoIcon, XMarkIcon,
   UserGroupIcon, FolderOpenIcon,
-  ListBulletIcon
+  ListBulletIcon, TrashIcon, LinkIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
+interface Tema {
+  titulo: string;
+  material_url: string;
+}
+
 interface Modulo {
   modulo: string;
-  temas: string[];
+  temas: (Tema | string)[];
 }
 
 interface Curso {
@@ -26,7 +31,7 @@ interface Curso {
 interface Estudiante {
   id: string;
   nombre_completo: string;
-  usuario: string; // <-- CAMBIADO DE CORREO A USUARIO
+  usuario: string;
   password?: string;
   curso_id: string;
   pago_completado: boolean;
@@ -47,10 +52,10 @@ export default function AdminCursosPage() {
   const [cursoEditandoId, setCursoEditandoId] = useState<string | null>(null); 
   const [uploading, setUploading] = useState(false);
 
-  const [formCurso, setFormCurso] = useState<{ nombre: string, ubicacion: string, fecha_curso: string, temario: { modulo: string, temasStr: string }[] }>({ 
+  const [formCurso, setFormCurso] = useState<{ nombre: string, ubicacion: string, fecha_curso: string, temario: { modulo: string, temas: Tema[] }[] }>({ 
     nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] 
   });
-  const [formAlumno, setFormAlumno] = useState({ nombre_completo: '', usuario: '', password: '', curso_id: '' }); // <-- CAMBIADO A USUARIO
+  const [formAlumno, setFormAlumno] = useState({ nombre_completo: '', usuario: '', password: '', curso_id: '' });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
@@ -66,18 +71,30 @@ export default function AdminCursosPage() {
     fetchData();
   }, [fetchData]);
 
+  const handleEliminarCurso = async (id: string) => {
+    if (confirm('¿Estás seguro de eliminar este curso? Esta acción no se puede deshacer.')) {
+      const { error } = await supabase.from('cursos').delete().eq('id', id);
+      if (!error) fetchData();
+      else alert(error.message);
+    }
+  };
+
+  const handleEliminarAlumno = async (id: string) => {
+    if (confirm('¿Estás seguro de eliminar a este alumno?')) {
+      const { error } = await supabase.from('estudiantes').delete().eq('id', id);
+      if (!error) fetchData();
+      else alert(error.message);
+    }
+  };
+
   const handleGuardarCurso = async (e: React.FormEvent) => {
     e.preventDefault();
-    const temarioFormateado = formCurso.temario.map(m => ({
-      modulo: m.modulo,
-      temas: m.temasStr.split(',').map(t => t.trim()).filter(t => t !== '')
-    }));
 
     const payload = {
       nombre: formCurso.nombre,
       ubicacion: formCurso.ubicacion,
       fecha_curso: formCurso.fecha_curso,
-      temario: temarioFormateado
+      temario: formCurso.temario 
     };
 
     if (cursoEditandoId) {
@@ -100,10 +117,12 @@ export default function AdminCursosPage() {
 
   const abrirEdicionCurso = (curso: Curso) => {
     setCursoEditandoId(curso.id);
+    
     const temarioUI = (curso.temario || []).map(m => ({
       modulo: m.modulo,
-      temasStr: m.temas.join(', ')
+      temas: m.temas.map((t: Tema | string) => typeof t === 'string' ? { titulo: t, material_url: '' } : t)
     }));
+
     setFormCurso({
       nombre: curso.nombre,
       ubicacion: curso.ubicacion,
@@ -130,17 +149,17 @@ export default function AdminCursosPage() {
     } else alert(error.message);
   };
 
-  const handleToggleTema = (tema: string) => {
+  const handleToggleTema = (temaTitulo: string) => {
     if (!alumnoEditando) return;
     
     const cursoAsignado = cursos.find(c => c.id === alumnoEditando.curso_id);
     if (!cursoAsignado) return;
 
     let nuevosTemas = [...(alumnoEditando.temas_completados || [])];
-    if (nuevosTemas.includes(tema)) {
-      nuevosTemas = nuevosTemas.filter(t => t !== tema);
+    if (nuevosTemas.includes(temaTitulo)) {
+      nuevosTemas = nuevosTemas.filter(t => t !== temaTitulo);
     } else {
-      nuevosTemas.push(tema);
+      nuevosTemas.push(temaTitulo);
     }
 
     const totalTemas = cursoAsignado.temario.reduce((acc, mod) => acc + mod.temas.length, 0);
@@ -248,17 +267,24 @@ export default function AdminCursosPage() {
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-6 animate-in fade-in duration-300">
           {estudiantes.map(alumno => (
             <div key={alumno.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
-              <div className="absolute top-4 right-4 z-10">
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button 
                   onClick={() => { setAlumnoEditando(alumno); setModalVisible('progreso'); }}
-                  className="bg-black p-3 rounded-xl border border-gray-700 hover:border-cyan-500 hover:text-cyan-400 transition-colors shadow-lg"
-                  title="Gestionar Progreso, Temas y Fotos"
+                  className="bg-black p-2 rounded-xl border border-gray-700 hover:border-cyan-500 hover:text-cyan-400 transition-colors shadow-lg"
+                  title="Gestionar Progreso"
                 >
                   <PencilIcon className="h-4 w-4" />
                 </button>
+                <button 
+                  onClick={() => handleEliminarAlumno(alumno.id)}
+                  className="bg-black p-2 rounded-xl border border-gray-700 hover:border-red-500 hover:text-red-400 transition-colors shadow-lg"
+                  title="Eliminar Alumno"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
 
-              <div className="mb-4 pr-12">
+              <div className="mb-4 pr-20">
                 <h3 className="text-xl font-black uppercase italic truncate">{alumno.nombre_completo}</h3>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">User: {alumno.usuario}</p>
               </div>
@@ -305,7 +331,8 @@ export default function AdminCursosPage() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
           {cursos.map(curso => (
             <div key={curso.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group hover:border-purple-500/40 transition-all flex flex-col">
-              <div className="absolute top-4 right-4 z-10">
+              
+              <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button 
                   onClick={() => abrirEdicionCurso(curso)}
                   className="bg-black p-2 rounded-xl border border-gray-700 hover:border-purple-500 hover:text-purple-400 transition-colors shadow-lg"
@@ -313,9 +340,16 @@ export default function AdminCursosPage() {
                 >
                   <PencilIcon className="h-4 w-4" />
                 </button>
+                <button 
+                  onClick={() => handleEliminarCurso(curso.id)}
+                  className="bg-black p-2 rounded-xl border border-gray-700 hover:border-red-500 hover:text-red-400 transition-colors shadow-lg"
+                  title="Eliminar Curso"
+                >
+                  <TrashIcon className="h-4 w-4" />
+                </button>
               </div>
 
-              <div className="mb-4 pr-10">
+              <div className="mb-4 pr-20">
                 <h3 className="text-xl font-black uppercase italic text-purple-400">{curso.nombre}</h3>
                 <p className="text-[10px] text-gray-500 uppercase font-black mt-1">{curso.temario?.length || 0} Módulos Registrados</p>
               </div>
@@ -354,80 +388,130 @@ export default function AdminCursosPage() {
               
               {modalVisible === 'curso' && (
                 <form onSubmit={handleGuardarCurso} className="space-y-4">
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Nombre del Curso</label>
-                    <input required value={formCurso.nombre} onChange={e => setFormCurso({...formCurso, nombre: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" placeholder="Ej: Especialidad CNC Router" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Ubicación</label>
-                    <input required value={formCurso.ubicacion} onChange={e => setFormCurso({...formCurso, ubicacion: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
-                  </div>
-                  <div>
-                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Fecha del Curso</label>
-                    <input required value={formCurso.fecha_curso} onChange={e => setFormCurso({...formCurso, fecha_curso: e.target.value})} type="date" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="md:col-span-2">
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Nombre del Curso</label>
+                      <input required value={formCurso.nombre} onChange={e => setFormCurso({...formCurso, nombre: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" placeholder="Ej: Especialidad CNC Router" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Ubicación</label>
+                      <input required value={formCurso.ubicacion} onChange={e => setFormCurso({...formCurso, ubicacion: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
+                    </div>
+                    <div>
+                      <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Fecha del Curso</label>
+                      <input required value={formCurso.fecha_curso} onChange={e => setFormCurso({...formCurso, fecha_curso: e.target.value})} type="date" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-cyan-500 outline-none" />
+                    </div>
                   </div>
 
-                  <div className="border-t border-gray-800 pt-4 mt-4">
-                    <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest flex justify-between items-center mb-4">
-                      <span>Temario / Módulos</span>
+                  <div className="border-t border-gray-800 pt-4 mt-6">
+                    <div className="flex justify-between items-center mb-4">
+                      <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">
+                        Temario / Módulos
+                      </label>
                       <button 
                         type="button" 
-                        onClick={() => setFormCurso({...formCurso, temario: [...formCurso.temario, { modulo: '', temasStr: '' }]})}
-                        className="bg-gray-800 text-white px-2 py-1 rounded-md text-[9px] hover:bg-gray-700 flex items-center gap-1"
+                        onClick={() => setFormCurso({...formCurso, temario: [...formCurso.temario, { modulo: '', temas: [{titulo: '', material_url: ''}] }]})}
+                        className="bg-gray-800 text-white px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest hover:bg-gray-700 flex items-center gap-1 transition-all"
                       >
                         <PlusIcon className="h-3 w-3" /> Añadir Módulo
                       </button>
-                    </label>
+                    </div>
                     
                     <div className="space-y-4">
-                      {formCurso.temario.map((mod, index) => (
-                        <div key={index} className="bg-black border border-gray-800 p-4 rounded-xl relative">
+                      {formCurso.temario.map((mod, modIndex) => (
+                        <div key={modIndex} className="bg-black border border-gray-800 p-5 rounded-2xl relative">
                           <button 
                             type="button" 
                             onClick={() => {
                               const nuevoTemario = [...formCurso.temario];
-                              nuevoTemario.splice(index, 1);
+                              nuevoTemario.splice(modIndex, 1);
                               setFormCurso({...formCurso, temario: nuevoTemario});
                             }}
-                            className="absolute top-2 right-2 text-gray-600 hover:text-red-500"
+                            className="absolute top-4 right-4 text-gray-600 hover:text-red-500 transition-colors"
                           >
-                            <XMarkIcon className="h-4 w-4" />
+                            <TrashIcon className="h-5 w-5" />
                           </button>
+                          
                           <input 
                             required 
                             placeholder="Nombre del Módulo (Ej: Módulo 1)" 
                             value={mod.modulo}
                             onChange={(e) => {
                               const nuevoTemario = [...formCurso.temario];
-                              nuevoTemario[index].modulo = e.target.value;
+                              nuevoTemario[modIndex].modulo = e.target.value;
                               setFormCurso({...formCurso, temario: nuevoTemario});
                             }}
-                            className="w-full bg-transparent border-b border-gray-800 mb-3 pb-2 outline-none text-xs font-bold text-white focus:border-cyan-500" 
+                            className="w-11/12 bg-transparent border-b border-gray-800 mb-4 pb-2 outline-none text-sm font-bold text-cyan-400 focus:border-cyan-500" 
                           />
-                          <textarea 
-                            required 
-                            placeholder="Escribe los temas separados por coma (Ej: Bienvenida, Router, Vectores)" 
-                            value={mod.temasStr}
-                            onChange={(e) => {
-                              const nuevoTemario = [...formCurso.temario];
-                              nuevoTemario[index].temasStr = e.target.value;
-                              setFormCurso({...formCurso, temario: nuevoTemario});
-                            }}
-                            className="w-full bg-transparent outline-none text-[11px] text-gray-400 min-h-10 resize-none" 
-                          />
+
+                          <div className="space-y-3 pl-4 border-l border-gray-800">
+                            {mod.temas.map((tema, temaIndex) => (
+                              <div key={temaIndex} className="flex flex-col gap-2 relative group bg-[#111] p-3 rounded-xl border border-gray-800">
+                                <div className="flex gap-2">
+                                  <input 
+                                    required 
+                                    placeholder="Nombre del Tema (Ej: Tipos de brocas)" 
+                                    value={tema.titulo}
+                                    onChange={(e) => {
+                                      const nuevoTemario = [...formCurso.temario];
+                                      nuevoTemario[modIndex].temas[temaIndex].titulo = e.target.value;
+                                      setFormCurso({...formCurso, temario: nuevoTemario});
+                                    }}
+                                    className="flex-1 bg-transparent outline-none text-xs text-white" 
+                                  />
+                                  <button 
+                                    type="button" 
+                                    onClick={() => {
+                                      const nuevoTemario = [...formCurso.temario];
+                                      nuevoTemario[modIndex].temas.splice(temaIndex, 1);
+                                      setFormCurso({...formCurso, temario: nuevoTemario});
+                                    }}
+                                    className="text-gray-600 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                                  >
+                                    <XMarkIcon className="h-4 w-4" />
+                                  </button>
+                                </div>
+                                <div className="flex items-center gap-2 border-t border-gray-800 pt-2">
+                                  <LinkIcon className="h-3 w-3 text-gray-500" />
+                                  <input 
+                                    placeholder="URL Material de Apoyo (Video, PDF) - Opcional" 
+                                    value={tema.material_url}
+                                    onChange={(e) => {
+                                      const nuevoTemario = [...formCurso.temario];
+                                      nuevoTemario[modIndex].temas[temaIndex].material_url = e.target.value;
+                                      setFormCurso({...formCurso, temario: nuevoTemario});
+                                    }}
+                                    className="flex-1 bg-transparent outline-none text-[10px] text-cyan-500" 
+                                  />
+                                </div>
+                              </div>
+                            ))}
+                            
+                            <button 
+                              type="button" 
+                              onClick={() => {
+                                const nuevoTemario = [...formCurso.temario];
+                                nuevoTemario[modIndex].temas.push({titulo: '', material_url: ''});
+                                setFormCurso({...formCurso, temario: nuevoTemario});
+                              }}
+                              className="text-[10px] font-bold text-gray-500 hover:text-cyan-400 uppercase tracking-widest flex items-center gap-1 pt-2"
+                            >
+                              <PlusIcon className="h-3 w-3" /> Añadir Tema
+                            </button>
+                          </div>
+
                         </div>
                       ))}
                       {formCurso.temario.length === 0 && (
-                        <p className="text-[10px] text-gray-600 italic text-center">No has agregado módulos. Haz clic en &quot;Añadir Módulo&quot;.</p>
+                        <p className="text-[10px] text-gray-600 italic text-center py-4">No has agregado módulos. Haz clic en &quot;Añadir Módulo&quot;.</p>
                       )}
                     </div>
                   </div>
 
-                  <button className="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest mt-4">Guardar Curso</button>
+                  <button className="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest mt-6 shadow-lg active:scale-95 transition-all">Guardar Curso</button>
                 </form>
               )}
 
-              {/* MODAL: NUEVO ALUMNO */}
               {modalVisible === 'alumno' && (
                 <form onSubmit={handleGuardarAlumno} className="space-y-4">
                   <div>
@@ -453,7 +537,6 @@ export default function AdminCursosPage() {
                 </form>
               )}
 
-              {/* MODAL: GESTIONAR PROGRESO CON CHECKBOXES */}
               {modalVisible === 'progreso' && alumnoEditando && (
                 <form onSubmit={handleActualizarProgreso} className="space-y-6">
                   
@@ -469,7 +552,7 @@ export default function AdminCursosPage() {
                     </div>
                   </div>
 
-                  <div className="bg-black/50 p-4 rounded-2xl border border-gray-800 max-h-60 overflow-y-auto space-y-4">
+                  <div className="bg-black/50 p-4 rounded-2xl border border-gray-800 max-h-80 overflow-y-auto space-y-4">
                     <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest flex items-center gap-2 mb-3">
                       <ListBulletIcon className="h-4 w-4" /> Temario del Curso
                     </label>
@@ -478,20 +561,25 @@ export default function AdminCursosPage() {
                       <div key={i}>
                         <h4 className="text-xs font-bold text-cyan-500 uppercase italic mb-2">{mod.modulo}</h4>
                         <div className="space-y-2 pl-2">
-                          {mod.temas.map((tema, j) => (
-                            <label key={j} className="flex items-center gap-3 cursor-pointer group">
-                              <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${alumnoEditando.temas_completados?.includes(tema) ? 'bg-cyan-600 border-cyan-600' : 'border-gray-600 group-hover:border-cyan-500'}`}>
-                                {alumnoEditando.temas_completados?.includes(tema) && <CheckBadgeIcon className="w-3 h-3 text-white" />}
-                              </div>
-                              <input 
-                                type="checkbox" 
-                                className="hidden" 
-                                checked={alumnoEditando.temas_completados?.includes(tema) || false}
-                                onChange={() => handleToggleTema(tema)}
-                              />
-                              <span className={`text-xs ${alumnoEditando.temas_completados?.includes(tema) ? 'text-gray-300 line-through opacity-70' : 'text-gray-100'}`}>{tema}</span>
-                            </label>
-                          ))}
+                          {mod.temas.map((temaRaw: Tema | string, j: number) => {
+                            const tituloTema = typeof temaRaw === 'string' ? temaRaw : temaRaw.titulo;
+                            const isChecked = alumnoEditando.temas_completados?.includes(tituloTema);
+
+                            return (
+                              <label key={j} className="flex items-center gap-3 cursor-pointer group">
+                                <div className={`w-5 h-5 rounded-md border flex items-center justify-center transition-colors ${isChecked ? 'bg-cyan-600 border-cyan-600' : 'border-gray-600 group-hover:border-cyan-500'}`}>
+                                  {isChecked && <CheckBadgeIcon className="w-3 h-3 text-white" />}
+                                </div>
+                                <input 
+                                  type="checkbox" 
+                                  className="hidden" 
+                                  checked={isChecked || false}
+                                  onChange={() => handleToggleTema(tituloTema)}
+                                />
+                                <span className={`text-xs ${isChecked ? 'text-gray-300 line-through opacity-70' : 'text-gray-100'}`}>{tituloTema}</span>
+                              </label>
+                            )
+                          })}
                         </div>
                       </div>
                     ))}

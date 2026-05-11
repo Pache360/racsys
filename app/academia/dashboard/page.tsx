@@ -2,20 +2,25 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
-import { jsPDF } from 'jspdf';
 import { 
   AcademicCapIcon, 
   ArrowRightOnRectangleIcon, 
   DocumentArrowDownIcon,
   PhotoIcon,
   CheckBadgeIcon,
-  BookOpenIcon
+  BookOpenIcon,
+  LinkIcon 
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
+interface Tema {
+  titulo: string;
+  material_url?: string;
+}
+
 interface Modulo {
   modulo: string;
-  temas: string[];
+  temas: (Tema | string)[];
 }
 
 interface Curso {
@@ -23,13 +28,13 @@ interface Curso {
   nombre: string;
   ubicacion: string;
   fecha_curso: string;
-  temario: Modulo[];
+  temario: Modulo[]; 
 }
 
 interface Alumno {
   id: string;
   nombre_completo: string;
-  usuario: string;
+  usuario: string; 
   curso_id: string;
   pago_completado: boolean;
   progreso: number;
@@ -89,8 +94,12 @@ export default function AcademiaDashboard() {
     fetchDatosAlumno();
   }, [fetchDatosAlumno]);
 
-  const generarCertificadoPDF = () => {
+  // CORRECCIÓN PARA VERCEL: Importación dinámica de jsPDF
+  const generarCertificadoPDF = async () => {
     if (!alumno || !curso) return;
+
+    // Solo carga la librería cuando el alumno hace clic
+    const { jsPDF } = await import('jspdf');
 
     const doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1280, 720] });
 
@@ -122,18 +131,18 @@ export default function AcademiaDashboard() {
     doc.save(`Constancia_${alumno.nombre_completo.replace(/\s+/g, '_')}.pdf`);
   };
 
-  // LÓGICA PARA ENCONTRAR EL MÓDULO ACTUAL
   const getModuloActual = () => {
     if (!curso || !curso.temario) return null;
     const completados = alumno?.temas_completados || [];
 
-    // Recorremos los módulos para encontrar el primero que no esté al 100%
     for (const mod of curso.temario) {
-      const todosTerminados = mod.temas.every(t => completados.includes(t));
+      const todosTerminados = mod.temas.every((t: Tema | string) => {
+        const titulo = typeof t === 'string' ? t : t.titulo;
+        return completados.includes(titulo);
+      });
       if (!todosTerminados) return mod;
     }
     
-    // Si terminó todos, mostramos el último
     return curso.temario[curso.temario.length - 1] || null;
   };
 
@@ -178,21 +187,37 @@ export default function AcademiaDashboard() {
               </div>
             </div>
 
-            {/* CAJA DEL MÓDULO ACTUAL (LO QUE EL ALUMNO VE) */}
+            {/* MÓDULO ACTUAL CON LINKS DE MATERIALES */}
             {moduloActual && (
               <div className="mb-6 bg-black border border-gray-800 rounded-2xl p-4">
-                <div className="flex items-center gap-2 text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-3">
+                <div className="flex items-center gap-2 text-[10px] font-black text-cyan-500 uppercase tracking-widest mb-3 border-b border-gray-800 pb-2">
                   <BookOpenIcon className="h-4 w-4" /> Estudiando: {moduloActual.modulo}
                 </div>
-                <ul className="space-y-2">
-                  {moduloActual.temas.map((tema, i) => {
-                    const completado = alumno.temas_completados?.includes(tema);
+                <ul className="space-y-4">
+                  {moduloActual.temas.map((temaRaw: Tema | string, i: number) => {
+                    const titulo = typeof temaRaw === 'string' ? temaRaw : temaRaw.titulo;
+                    const material = typeof temaRaw === 'string' ? '' : temaRaw.material_url;
+                    const completado = alumno.temas_completados?.includes(titulo);
+                    
                     return (
-                      <li key={i} className="flex items-start gap-3">
-                        <div className={`mt-0.5 w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${completado ? 'bg-green-500 border-green-500' : 'border-gray-700'}`}>
-                          {completado && <CheckBadgeIcon className="w-3 h-3 text-black" />}
+                      <li key={i} className="flex flex-col gap-1.5">
+                        <div className="flex items-start gap-3">
+                          <div className={`mt-0.5 w-4 h-4 rounded-full border shrink-0 flex items-center justify-center ${completado ? 'bg-green-500 border-green-500' : 'border-gray-700'}`}>
+                            {completado && <CheckBadgeIcon className="w-3 h-3 text-black" />}
+                          </div>
+                          <span className={`text-xs ${completado ? 'text-gray-500 line-through' : 'text-white font-medium'}`}>{titulo}</span>
                         </div>
-                        <span className={`text-xs ${completado ? 'text-gray-500 line-through' : 'text-white font-medium'}`}>{tema}</span>
+                        {/* BOTÓN DE MATERIAL DE APOYO */}
+                        {material && !completado && (
+                          <a 
+                            href={material} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            className="ml-7 inline-flex items-center gap-1.5 bg-cyan-900/30 text-cyan-400 border border-cyan-500/30 px-3 py-1.5 rounded-lg text-[9px] font-black uppercase tracking-widest w-fit hover:bg-cyan-500 hover:text-white transition-all"
+                          >
+                            <LinkIcon className="h-3 w-3" /> Ver Material
+                          </a>
+                        )}
                       </li>
                     );
                   })}
