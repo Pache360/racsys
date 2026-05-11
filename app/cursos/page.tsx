@@ -6,7 +6,7 @@ import {
   ArrowLeftIcon, AcademicCapIcon, PlusIcon, 
   PencilIcon, CheckBadgeIcon, PhotoIcon, XMarkIcon,
   UserGroupIcon, FolderOpenIcon,
-  ListBulletIcon, TrashIcon, LinkIcon
+  ListBulletIcon, TrashIcon, LinkIcon, BuildingOfficeIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
@@ -17,7 +17,7 @@ interface Tema {
 
 interface Modulo {
   modulo: string;
-  temas: (Tema | string)[];
+  temas: (Tema | string)[]; // Soportamos temas antiguos y nuevos
 }
 
 interface Curso {
@@ -28,12 +28,21 @@ interface Curso {
   temario: Modulo[];
 }
 
+// NUEVO: Interfaz para Empresas RH
+interface EmpresaRH {
+  id: string;
+  nombre_empresa: string;
+  usuario: string;
+  password?: string;
+}
+
 interface Estudiante {
   id: string;
   nombre_completo: string;
   usuario: string;
   password?: string;
   curso_id: string;
+  empresa_id: string | null; // NUEVO: Vinculación a empresa
   pago_completado: boolean;
   progreso: number;
   evidencias: string[];
@@ -43,11 +52,13 @@ interface Estudiante {
 export default function AdminCursosPage() {
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
+  const [empresas, setEmpresas] = useState<EmpresaRH[]>([]); // Estado de empresas
   const [loading, setLoading] = useState(true);
   
-  const [vistaActiva, setVistaActiva] = useState<'Alumnos' | 'Cursos'>('Alumnos');
+  // Agregamos 'Empresas' al menú de vistas
+  const [vistaActiva, setVistaActiva] = useState<'Alumnos' | 'Cursos' | 'Empresas'>('Alumnos');
 
-  const [modalVisible, setModalVisible] = useState<'ninguno' | 'curso' | 'alumno' | 'progreso'>('ninguno');
+  const [modalVisible, setModalVisible] = useState<'ninguno' | 'curso' | 'alumno' | 'progreso' | 'empresa'>('ninguno');
   const [alumnoEditando, setAlumnoEditando] = useState<Estudiante | null>(null);
   const [cursoEditandoId, setCursoEditandoId] = useState<string | null>(null); 
   const [uploading, setUploading] = useState(false);
@@ -55,15 +66,18 @@ export default function AdminCursosPage() {
   const [formCurso, setFormCurso] = useState<{ nombre: string, ubicacion: string, fecha_curso: string, temario: { modulo: string, temas: Tema[] }[] }>({ 
     nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] 
   });
-  const [formAlumno, setFormAlumno] = useState({ nombre_completo: '', usuario: '', password: '', curso_id: '' });
+  const [formAlumno, setFormAlumno] = useState({ nombre_completo: '', usuario: '', password: '', curso_id: '', empresa_id: '' });
+  const [formEmpresa, setFormEmpresa] = useState({ nombre_empresa: '', usuario: '', password: '' });
 
   const fetchData = useCallback(async () => {
     setLoading(true);
     const { data: dataCursos } = await supabase.from('cursos').select('*').order('fecha_curso', { ascending: false });
     const { data: dataEstudiantes } = await supabase.from('estudiantes').select('*').order('nombre_completo', { ascending: true });
+    const { data: dataEmpresas } = await supabase.from('empresas_rh').select('*').order('nombre_empresa', { ascending: true });
     
     if (dataCursos) setCursos(dataCursos || []);
     if (dataEstudiantes) setEstudiantes(dataEstudiantes || []);
+    if (dataEmpresas) setEmpresas(dataEmpresas || []);
     setLoading(false);
   }, []);
 
@@ -82,6 +96,14 @@ export default function AdminCursosPage() {
   const handleEliminarAlumno = async (id: string) => {
     if (confirm('¿Estás seguro de eliminar a este alumno?')) {
       const { error } = await supabase.from('estudiantes').delete().eq('id', id);
+      if (!error) fetchData();
+      else alert(error.message);
+    }
+  };
+
+  const handleEliminarEmpresa = async (id: string) => {
+    if (confirm('¿Eliminar empresa y desvincular alumnos? No se borrarán los alumnos, solo se quitarán de este grupo.')) {
+      const { error } = await supabase.from('empresas_rh').delete().eq('id', id);
       if (!error) fetchData();
       else alert(error.message);
     }
@@ -115,9 +137,20 @@ export default function AdminCursosPage() {
     }
   };
 
+  const handleGuardarEmpresa = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const { error } = await supabase.from('empresas_rh').insert([formEmpresa]);
+    if (!error) {
+      setModalVisible('ninguno');
+      setFormEmpresa({ nombre_empresa: '', usuario: '', password: '' });
+      fetchData();
+    } else alert(error.message);
+  };
+
   const abrirEdicionCurso = (curso: Curso) => {
     setCursoEditandoId(curso.id);
     
+    // Convertir de forma segura para TypeScript
     const temarioUI = (curso.temario || []).map(m => ({
       modulo: m.modulo,
       temas: m.temas.map((t: Tema | string) => typeof t === 'string' ? { titulo: t, material_url: '' } : t)
@@ -136,6 +169,7 @@ export default function AdminCursosPage() {
     e.preventDefault();
     const { error } = await supabase.from('estudiantes').insert([{
       ...formAlumno,
+      empresa_id: formAlumno.empresa_id === '' ? null : formAlumno.empresa_id,
       pago_completado: false,
       progreso: 0,
       evidencias: [],
@@ -143,7 +177,7 @@ export default function AdminCursosPage() {
     }]);
     if (!error) {
       setModalVisible('ninguno');
-      setFormAlumno({ nombre_completo: '', usuario: '', password: '', curso_id: '' });
+      setFormAlumno({ nombre_completo: '', usuario: '', password: '', curso_id: '', empresa_id: '' });
       setVistaActiva('Alumnos'); 
       fetchData();
     } else alert(error.message);
@@ -217,6 +251,7 @@ export default function AdminCursosPage() {
 
   const getNombreCurso = (id: string) => cursos.find(c => c.id === id)?.nombre || 'Curso Desconocido';
   const getCursoObj = (id: string) => cursos.find(c => c.id === id) || null;
+  const getNombreEmpresa = (id: string | null) => id ? empresas.find(e => e.id === id)?.nombre_empresa : 'Particular';
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] text-white p-4 md:p-8 relative">
@@ -238,28 +273,28 @@ export default function AdminCursosPage() {
           </div>
         </div>
         
-        <div className="flex gap-3 w-full md:w-auto">
-          <button onClick={() => { setCursoEditandoId(null); setFormCurso({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] }); setModalVisible('curso'); }} className="flex-1 md:flex-none bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-xl font-bold transition-all text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+        <div className="flex flex-wrap gap-3 w-full md:w-auto">
+          <button onClick={() => { setFormEmpresa({ nombre_empresa: '', usuario: '', password: '' }); setModalVisible('empresa'); }} className="bg-orange-600 hover:bg-orange-500 text-white px-4 py-3 rounded-xl font-bold transition-all text-[10px] uppercase tracking-widest flex items-center gap-2">
+            <BuildingOfficeIcon className="h-4 w-4" /> Nueva Empresa
+          </button>
+          <button onClick={() => { setCursoEditandoId(null); setFormCurso({ nombre: '', ubicacion: 'Pache 360 Studio', fecha_curso: '', temario: [] }); setModalVisible('curso'); }} className="bg-gray-800 hover:bg-gray-700 text-white px-4 py-3 rounded-xl font-bold transition-all text-[10px] uppercase tracking-widest flex items-center gap-2">
             <PlusIcon className="h-4 w-4" /> Nuevo Curso
           </button>
-          <button onClick={() => setModalVisible('alumno')} className="flex-1 md:flex-none bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-cyan-600/20 text-xs uppercase tracking-widest flex items-center justify-center gap-2">
+          <button onClick={() => setModalVisible('alumno')} className="bg-cyan-600 hover:bg-cyan-500 text-white px-6 py-3 rounded-xl font-bold transition-all shadow-lg shadow-cyan-600/20 text-[10px] uppercase tracking-widest flex items-center gap-2">
             <PlusIcon className="h-4 w-4" /> Nuevo Alumno
           </button>
         </div>
       </header>
 
-      <div className="flex bg-[#111] p-1.5 rounded-2xl w-full max-w-md mb-8 border border-gray-800/50 mx-auto sm:mx-0">
-        <button 
-          onClick={() => setVistaActiva('Alumnos')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${vistaActiva === 'Alumnos' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'text-gray-500 hover:text-gray-300'}`}
-        >
+      <div className="flex bg-[#111] p-1.5 rounded-2xl w-full max-w-xl mb-8 border border-gray-800/50">
+        <button onClick={() => setVistaActiva('Alumnos')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActiva === 'Alumnos' ? 'bg-cyan-600 text-white shadow-lg shadow-cyan-600/20' : 'text-gray-500 hover:text-gray-300'}`}>
           <UserGroupIcon className="h-4 w-4" /> Alumnos
         </button>
-        <button 
-          onClick={() => setVistaActiva('Cursos')}
-          className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${vistaActiva === 'Cursos' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-500 hover:text-gray-300'}`}
-        >
-          <FolderOpenIcon className="h-4 w-4" /> Lista de Cursos
+        <button onClick={() => setVistaActiva('Cursos')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActiva === 'Cursos' ? 'bg-purple-600 text-white shadow-lg shadow-purple-600/20' : 'text-gray-500 hover:text-gray-300'}`}>
+          <FolderOpenIcon className="h-4 w-4" /> Cursos
+        </button>
+        <button onClick={() => setVistaActiva('Empresas')} className={`flex-1 flex items-center justify-center gap-2 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all ${vistaActiva === 'Empresas' ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20' : 'text-gray-500 hover:text-gray-300'}`}>
+          <BuildingOfficeIcon className="h-4 w-4" /> Empresas / RH
         </button>
       </div>
 
@@ -289,9 +324,15 @@ export default function AdminCursosPage() {
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">User: {alumno.usuario}</p>
               </div>
 
-              <div className="bg-black border border-gray-800 rounded-2xl p-4 mb-4">
-                <p className="text-[9px] text-cyan-500 font-black uppercase tracking-widest mb-1">Curso Asignado</p>
-                <p className="text-sm font-bold truncate">{getNombreCurso(alumno.curso_id)}</p>
+              <div className="bg-black border border-gray-800 rounded-xl p-3 mb-4 flex justify-between items-center">
+                <div>
+                    <p className="text-[8px] text-cyan-500 font-black uppercase">Empresa</p>
+                    <p className="text-[10px] font-bold">{getNombreEmpresa(alumno.empresa_id)}</p>
+                </div>
+                <div className="text-right">
+                    <p className="text-[8px] text-purple-500 font-black uppercase">Curso</p>
+                    <p className="text-[10px] font-bold">{getNombreCurso(alumno.curso_id)}</p>
+                </div>
               </div>
 
               <div className="space-y-4">
@@ -374,18 +415,77 @@ export default function AdminCursosPage() {
         </div>
       )}
 
+      {vistaActiva === 'Empresas' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in duration-300">
+          {empresas.map(emp => (
+            <div key={emp.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 relative">
+              <button 
+                onClick={() => handleEliminarEmpresa(emp.id)} 
+                className="absolute top-4 right-4 text-gray-600 hover:text-red-500 transition-colors"
+                title="Eliminar Empresa"
+              >
+                <TrashIcon className="h-5 w-5" />
+              </button>
+              <div className="flex items-center gap-3 mb-4">
+                <BuildingOfficeIcon className="h-8 w-8 text-orange-500" />
+                <h3 className="text-xl font-black uppercase italic truncate">{emp.nombre_empresa}</h3>
+              </div>
+              <div className="bg-black p-4 rounded-2xl border border-gray-800 space-y-2">
+                <p className="text-[10px] text-gray-500 font-bold uppercase mb-2 border-b border-gray-800 pb-1">Acceso Portal RH</p>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">Usuario:</span>
+                  <span className="font-mono text-orange-400 font-bold">{emp.usuario}</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-gray-400">Alumnos Vinculados:</span>
+                  <span className="font-bold text-white">{estudiantes.filter(e => e.empresa_id === emp.id).length}</span>
+                </div>
+              </div>
+            </div>
+          ))}
+          {empresas.length === 0 && !loading && (
+            <div className="col-span-full text-center py-20 text-gray-600 font-black uppercase tracking-widest italic border border-dashed border-gray-800 rounded-3xl">
+              Aún no hay empresas registradas
+            </div>
+          )}
+        </div>
+      )}
+
       {modalVisible !== 'ninguno' && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="bg-[#111] border border-cyan-500/30 w-full max-w-lg rounded-t-4xl sm:rounded-4xl overflow-hidden shadow-2xl flex flex-col max-h-[90vh]">
             <div className="p-6 border-b border-gray-800 flex justify-between items-center bg-[#161616]">
               <h2 className="text-lg font-black text-cyan-400 uppercase italic">
-                {modalVisible === 'curso' ? (cursoEditandoId ? 'Editar Curso' : 'Crear Nuevo Curso') : modalVisible === 'alumno' ? 'Registrar Alumno' : 'Gestionar Avance'}
+                {modalVisible === 'curso' ? (cursoEditandoId ? 'Editar Curso' : 'Crear Nuevo Curso') 
+                 : modalVisible === 'alumno' ? 'Registrar Alumno' 
+                 : modalVisible === 'empresa' ? 'Nueva Empresa RH' 
+                 : 'Gestionar Avance'}
               </h2>
               <button onClick={() => setModalVisible('ninguno')}><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
             </div>
 
             <div className="overflow-y-auto p-6 md:p-8">
               
+              {/* MODAL EMPRESA */}
+              {modalVisible === 'empresa' && (
+                <form onSubmit={handleGuardarEmpresa} className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Nombre de la Empresa</label>
+                    <input required value={formEmpresa.nombre_empresa} onChange={e => setFormEmpresa({...formEmpresa, nombre_empresa: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-orange-500 outline-none" placeholder="Ej: Constructora del Sur" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Usuario RH (Login)</label>
+                    <input required value={formEmpresa.usuario} onChange={e => setFormEmpresa({...formEmpresa, usuario: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-orange-500 outline-none" placeholder="Ej: recursoshumanos" />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Contraseña RH</label>
+                    <input required value={formEmpresa.password} onChange={e => setFormEmpresa({...formEmpresa, password: e.target.value})} type="text" className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-orange-500 outline-none" placeholder="Contraseña segura" />
+                  </div>
+                  <button className="w-full bg-orange-600 hover:bg-orange-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest mt-4">Guardar Empresa</button>
+                </form>
+              )}
+
+              {/* MODAL CURSO */}
               {modalVisible === 'curso' && (
                 <form onSubmit={handleGuardarCurso} className="space-y-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -499,7 +599,6 @@ export default function AdminCursosPage() {
                               <PlusIcon className="h-3 w-3" /> Añadir Tema
                             </button>
                           </div>
-
                         </div>
                       ))}
                       {formCurso.temario.length === 0 && (
@@ -512,6 +611,7 @@ export default function AdminCursosPage() {
                 </form>
               )}
 
+              {/* MODAL ALUMNO */}
               {modalVisible === 'alumno' && (
                 <form onSubmit={handleGuardarAlumno} className="space-y-4">
                   <div>
@@ -533,18 +633,26 @@ export default function AdminCursosPage() {
                       {cursos.map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.fecha_curso})</option>)}
                     </select>
                   </div>
+                  
+                  {/* Selector de Empresa para B2B */}
+                  <div className="pt-2 border-t border-gray-800 mt-2">
+                    <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">¿Pertenece a alguna Empresa? (Opcional)</label>
+                    <select value={formAlumno.empresa_id} onChange={e => setFormAlumno({...formAlumno, empresa_id: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-orange-500 outline-none">
+                      <option value="">No, es alumno particular</option>
+                      {empresas.map(e => <option key={e.id} value={e.id}>{e.nombre_empresa}</option>)}
+                    </select>
+                  </div>
+
                   <button className="w-full bg-cyan-600 hover:bg-cyan-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest mt-4">Registrar Alumno</button>
                 </form>
               )}
 
+              {/* MODAL PROGRESO (CHECKBOXES) */}
               {modalVisible === 'progreso' && alumnoEditando && (
                 <form onSubmit={handleActualizarProgreso} className="space-y-6">
-                  
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">
-                        Progreso Calculado
-                      </label>
+                      <label className="text-[10px] font-black text-cyan-400 uppercase tracking-widest">Progreso Calculado</label>
                       <span className="text-lg font-black text-white">{alumnoEditando.progreso}%</span>
                     </div>
                     <div className="w-full h-2 bg-gray-900 rounded-full overflow-hidden">
