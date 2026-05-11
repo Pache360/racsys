@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/lib/supabase';
 import { 
   CalendarIcon, 
@@ -9,29 +9,41 @@ import {
   XMarkIcon,
   CheckCircleIcon,
   ChatBubbleLeftEllipsisIcon,
-  ClockIcon // Importado para el historial
+  ClockIcon 
 } from '@heroicons/react/24/outline';
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
+
+interface Proyecto {
+  id: string;
+  titulo: string;
+  cliente: string;
+  categoria: string;
+  estado: string;
+  fecha_entrega: string;
+  logo_url: string;
+  descripcion: string;
+  notas_cliente: string;
+}
 
 export default function PortalCliente() {
-  const [eventos, setEventos] = useState<any[]>([]);
+  const [eventos, setEventos] = useState<Proyecto[]>([]);
   const [misMarcas, setMisMarcas] = useState<string[]>([]);
   const [filtroMarca, setFiltroMarca] = useState('Todas');
   const [vista, setVista] = useState<'Cuadrícula' | 'Calendario'>('Cuadrícula');
   const [duenoNombre, setDuenoNombre] = useState('');
   const [loading, setLoading] = useState(true);
   
-  // NUEVO: Estado para alternar entre proyectos activos e historial
   const [mostrarHistorial, setMostrarHistorial] = useState(false);
   
-  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<any>(null);
+  const [proyectoSeleccionado, setProyectoSeleccionado] = useState<Proyecto | null>(null);
   const [mostrarCambios, setMostrarCambios] = useState(false);
   const [textoCambios, setTextoCambios] = useState('');
   const [zoomImagen, setZoomImagen] = useState(false);
 
   const router = useRouter();
 
-  const fetchContenidoVIP = async () => {
+  const fetchContenidoVIP = useCallback(async () => {
     const cookies = document.cookie.split('; ');
     const clienteIdCookie = cookies.find(row => row.startsWith('pache_cliente_id='));
     const idSesion = clienteIdCookie ? decodeURIComponent(clienteIdCookie.split('=')[1]) : null;
@@ -56,16 +68,16 @@ export default function PortalCliente() {
         .select('nombre')
         .or(`dueno_id.eq."${idSesion}",dueno_id.eq."${clienteDB?.acceso_pass || 'N/A'}",nombre.eq."${idSesion}"`);
 
-      const listaNombres = marcasAsociadas ? marcasAsociadas.map(m => m.nombre) : [idSesion];
-      const soloMarcas = listaNombres.filter(n => n.toLowerCase() !== idSesion.toLowerCase());
+      const listaNombres = marcasAsociadas ? marcasAsociadas.map((m: { nombre: string }) => m.nombre) : [idSesion];
+      const soloMarcas = listaNombres.filter((n: string) => n.toLowerCase() !== idSesion.toLowerCase());
       setMisMarcas(soloMarcas);
 
       const { data: todosLosProyectos } = await supabase.from('proyectos').select('*');
 
       if (todosLosProyectos) {
-        const filtrados = todosLosProyectos.filter(proy => {
+        const filtrados = todosLosProyectos.filter((proy: Proyecto) => {
           const pCliente = proy.cliente?.toLowerCase() || "";
-          return listaNombres.some(n => 
+          return listaNombres.some((n: string) => 
             pCliente.includes(n.toLowerCase()) || n.toLowerCase().includes(pCliente)
           );
         });
@@ -76,11 +88,11 @@ export default function PortalCliente() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [router]);
 
   useEffect(() => {
     fetchContenidoVIP();
-  }, [router]);
+  }, [fetchContenidoVIP]);
 
   const handleLogout = () => {
     document.cookie = "pache_auth=; path=/; expires=Thu, 01 Jan 1970 00:00:00 UTC; SameSite=Strict";
@@ -116,12 +128,9 @@ export default function PortalCliente() {
     }
   };
 
-  // ACTUALIZADO: Lógica de filtrado para ocultar autorizados por defecto y filtrar por marca
   const eventosAMostrar = eventos.filter(e => {
     const cumpleMarca = filtroMarca === 'Todas' || e.cliente === filtroMarca;
     const esFinalizado = ['Autorizado', 'Publicado', 'Finalizado', 'Entregado'].includes(e.estado);
-    
-    // Si mostrarHistorial es true, solo vemos los finalizados. Si es false, solo los activos.
     return cumpleMarca && (mostrarHistorial ? esFinalizado : !esFinalizado);
   });
 
@@ -140,7 +149,6 @@ export default function PortalCliente() {
         </div>
         
         <div className="flex items-center gap-3 w-full md:w-auto">
-          {/* GRUPO DE BOTONES DE VISTA Y FILTRO DE HISTORIAL */}
           <div className="flex bg-[#111] p-1 rounded-xl border border-gray-800">
             <button 
               onClick={() => setVista('Cuadrícula')} 
@@ -157,8 +165,7 @@ export default function PortalCliente() {
               <CalendarIcon className="h-5 w-5" />
             </button>
             
-            {/* NUEVO BOTÓN: Posts Anteriores / Historial */}
-            <div className="w-[1px] bg-gray-800 mx-1 my-1"></div>
+            <div className="w-px bg-gray-800 mx-1 my-1"></div>
             <button 
               onClick={() => setMostrarHistorial(!mostrarHistorial)} 
               className={`p-2 rounded-lg transition-all flex items-center gap-2 ${mostrarHistorial ? 'bg-orange-600 text-white' : 'text-gray-500 hover:text-orange-400'}`}
@@ -171,11 +178,12 @@ export default function PortalCliente() {
             </button>
           </div>
           
-          <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95 ml-auto"><ArrowRightOnRectangleIcon className="h-5 w-5" /></button>
+          <button onClick={handleLogout} className="bg-red-900/20 text-red-400 p-2.5 rounded-xl border border-red-500/20 hover:bg-red-900/40 transition-all active:scale-95 ml-auto">
+            <ArrowRightOnRectangleIcon className="h-5 w-5" />
+          </button>
         </div>
       </header>
 
-      {/* TÍTULO DINÁMICO DE SECCIÓN */}
       <div className="mb-6">
         <h2 className="text-[10px] font-black uppercase tracking-[0.3em] text-purple-500 flex items-center gap-2">
           <div className={`w-2 h-2 rounded-full ${mostrarHistorial ? 'bg-orange-500 animate-pulse' : 'bg-green-500'}`}></div>
@@ -192,7 +200,6 @@ export default function PortalCliente() {
         </div>
       )}
 
-      {/* CONTENIDO (se mantiene igual, usando eventosAMostrar filtrado) */}
       {eventosAMostrar.length === 0 ? (
         <NoContent />
       ) : vista === 'Cuadrícula' ? (
@@ -203,10 +210,12 @@ export default function PortalCliente() {
               onClick={() => setProyectoSeleccionado(item)}
               className="bg-[#111] border border-gray-800 rounded-3xl shadow-xl relative overflow-hidden group hover:border-purple-500/40 transition-all cursor-pointer flex flex-col"
             >
-              <div className="h-48 w-full overflow-hidden bg-black border-b border-gray-800">
-                <img 
+              <div className="h-48 w-full relative overflow-hidden bg-black border-b border-gray-800">
+                {/* 1. CORRECCIÓN DE IMAGEN PARA LA CUADRÍCULA */}
+                <Image 
                   src={item.logo_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000"} 
-                  className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500 opacity-70 group-hover:opacity-100"
+                  fill
+                  className="object-cover group-hover:scale-110 transition-transform duration-500 opacity-70 group-hover:opacity-100"
                   alt={item.titulo}
                 />
               </div>
@@ -239,7 +248,7 @@ export default function PortalCliente() {
               <div key={item.id} onClick={() => setProyectoSeleccionado(item)} className="flex gap-4 items-center border-b border-gray-800/50 pb-6 last:border-0 cursor-pointer hover:bg-white/5 p-2 rounded-2xl transition-all">
                 <div className="text-center min-w-15">
                   <span className="block text-[10px] font-black text-purple-500 uppercase">{new Date(item.fecha_entrega).toLocaleString('es-MX', {month: 'short'})}</span>
-                  <span className="block text-2xl font-black text-white">{new Date(item.fecha_entrega).getDate() + 1}</span>
+                  <span className="block text-2xl font-black text-white">{new Date(item.fecha_entrega).getUTCDate()}</span>
                 </div>
                 <div className="flex-1">
                   <h4 className="text-sm font-black uppercase italic text-white leading-none">{item.titulo}</h4>
@@ -254,7 +263,6 @@ export default function PortalCliente() {
         </div>
       )}
 
-      {/* MODAL DE DETALLE (se mantiene igual) */}
       {proyectoSeleccionado && (
         <div className="fixed inset-0 bg-black/95 z-50 flex items-center justify-center p-4 md:p-8 backdrop-blur-md">
           <div className="bg-[#0f0f0f] border border-gray-800 w-full max-w-4xl max-h-[90vh] rounded-4xl overflow-hidden flex flex-col shadow-2xl animate-in fade-in zoom-in duration-300">
@@ -270,8 +278,11 @@ export default function PortalCliente() {
 
             <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-8">
               <div className="relative group text-center">
-                <img 
+                {/* 2. CORRECCIÓN DE IMAGEN PARA EL MODAL DE DETALLE */}
+                <Image 
                   src={proyectoSeleccionado.logo_url || "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=1000"} 
+                  width={1200}
+                  height={800}
                   className={`mx-auto w-full ${zoomImagen ? 'h-auto' : 'max-h-100'} object-contain rounded-3xl border border-white/10 shadow-2xl cursor-zoom-in transition-all`}
                   alt="Diseño Pache 360"
                   onClick={() => setZoomImagen(!zoomImagen)}
@@ -281,17 +292,18 @@ export default function PortalCliente() {
 
               <div className="bg-white/5 p-6 rounded-3xl border border-white/5">
                 <h4 className="text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">Descripción del Proyecto</h4>
-                <p className="text-sm text-gray-300 leading-relaxed font-medium italic">"{proyectoSeleccionado.descripcion || "Sin descripción disponible."}"</p>
+                {/* 3. CORRECCIÓN DE COMILLAS ESCAPADAS (&quot;) */}
+                <p className="text-sm text-gray-300 leading-relaxed font-medium italic">&quot;{proyectoSeleccionado.descripcion || "Sin descripción disponible."}&quot;</p>
               </div>
 
               {proyectoSeleccionado.notas_cliente && (
                 <div className="bg-orange-500/10 p-6 rounded-3xl border border-orange-500/20">
                   <h4 className="text-[10px] font-black text-orange-400 uppercase tracking-widest mb-2 italic">Ajustes solicitados actualmente:</h4>
-                  <p className="text-sm text-orange-100 font-medium">"{proyectoSeleccionado.notas_cliente}"</p>
+                  {/* 3. CORRECCIÓN DE COMILLAS ESCAPADAS (&quot;) */}
+                  <p className="text-sm text-orange-100 font-medium">&quot;{proyectoSeleccionado.notas_cliente}&quot;</p>
                 </div>
               )}
 
-              {/* ACCIONES: Solo visibles si no está autorizado aún */}
               {!['Autorizado', 'Publicado', 'Finalizado'].includes(proyectoSeleccionado.estado) && (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <button 
@@ -319,7 +331,7 @@ export default function PortalCliente() {
                     value={textoCambios}
                     onChange={(e) => setTextoCambios(e.target.value)}
                     className="w-full bg-black border border-white/10 rounded-2xl p-4 text-sm text-white focus:border-orange-500 outline-none min-h-30"
-                    placeholder="Ej: El logo se ve muy pequeño, por favor cambiar el color del fondo a blanco..."
+                    placeholder="Ej: El logo se ve muy pequeño..."
                   />
                   <button 
                     onClick={() => handleEnviarCambios(proyectoSeleccionado.id)}
