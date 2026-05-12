@@ -42,7 +42,7 @@ export default function AcademiaRHLogin() {
     <main className="min-h-screen bg-[#0a0a0a] flex flex-col items-center justify-center p-4 relative overflow-hidden">
       <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-orange-900/20 blur-[120px] rounded-full pointer-events-none"></div>
       
-      <div className="w-full max-w-md bg-[#111] border border-orange-500/30 rounded-[2rem] p-8 shadow-2xl shadow-orange-900/20 z-10">
+      <div className="w-full max-w-md bg-[#111] border border-orange-500/30 rounded-4xl p-8 shadow-2xl shadow-orange-900/20 z-10">
         <div className="flex flex-col items-center mb-8">
           <div className="bg-orange-600 p-4 rounded-2xl mb-4 shadow-lg shadow-orange-600/20">
             <BuildingOfficeIcon className="h-8 w-8 text-white" />
