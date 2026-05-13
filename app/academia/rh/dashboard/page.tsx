@@ -10,8 +10,10 @@ import {
   UserGroupIcon,
   ListBulletIcon,
   XMarkIcon,
-  ClockIcon
+  ClockIcon,
+  PhotoIcon // IMPORTADO
 } from '@heroicons/react/24/outline';
+import Image from 'next/image'; // IMPORTADO
 
 interface Tema {
   titulo: string;
@@ -35,6 +37,7 @@ interface Estudiante {
   pago_completado: boolean;
   progreso: number;
   temas_completados: string[];
+  evidencias: string[]; // NUEVO
 }
 
 interface Curso {
@@ -95,9 +98,10 @@ export default function RHDashboard() {
 
       if (empresaData) {
         setEmpresa(empresaData);
+        // NUEVO: Agregado 'evidencias' a la consulta
         const { data: estudiantesData } = await supabase
           .from('estudiantes')
-          .select('id, nombre_completo, curso_id, pago_completado, progreso, temas_completados')
+          .select('id, nombre_completo, curso_id, pago_completado, progreso, temas_completados, evidencias')
           .eq('empresa_id', idSesion)
           .order('nombre_completo', { ascending: true });
         
@@ -268,7 +272,7 @@ export default function RHDashboard() {
             <div className="p-8 border-b border-white/5 flex justify-between items-center bg-[#141414]">
               <div>
                 <h2 className="text-2xl font-black uppercase italic text-white leading-none mb-1">{empleadoDetalle.nombre_completo}</h2>
-                <p className="text-orange-500 text-[10px] font-bold uppercase tracking-widest">Desglose de capacitación por temas</p>
+                <p className="text-orange-500 text-[10px] font-bold uppercase tracking-widest">Desglose de capacitación y evidencias</p>
               </div>
               <button 
                 onClick={() => setEmpleadoDetalle(null)}
@@ -279,6 +283,26 @@ export default function RHDashboard() {
             </div>
 
             <div className="flex-1 overflow-y-auto p-8 space-y-8">
+              {/* EVIDENCIA FOTOGRAFICA PARA RH */}
+              <div className="bg-black/40 border border-gray-800/50 rounded-3xl p-6">
+                <h4 className="text-xs font-black text-orange-400 uppercase tracking-widest mb-4 flex items-center gap-2">
+                  <PhotoIcon className="h-4 w-4" />
+                  Evidencia Fotográfica ({empleadoDetalle.evidencias?.length || 0})
+                </h4>
+                {empleadoDetalle.evidencias && empleadoDetalle.evidencias.length > 0 ? (
+                  <div className="grid grid-cols-3 sm:grid-cols-4 gap-3">
+                    {empleadoDetalle.evidencias.map((url, idx) => (
+                      <a key={idx} href={url} target="_blank" rel="noopener noreferrer" className="aspect-square relative rounded-xl overflow-hidden bg-gray-900 border border-gray-800 hover:border-orange-500 transition-colors block">
+                         <Image src={url} alt={`Evidencia ${idx + 1}`} fill className="object-cover" />
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-gray-500 italic uppercase font-bold text-center py-4">Aún no hay fotos subidas de este alumno.</p>
+                )}
+              </div>
+
+              {/* TEMARIO */}
               {getTemarioEmpleado(empleadoDetalle.curso_id).map((mod, i) => (
                 <div key={i} className="bg-black/40 border border-gray-800/50 rounded-3xl p-6">
                   <h4 className="text-xs font-black text-orange-400 uppercase tracking-widest mb-4 flex items-center gap-2">

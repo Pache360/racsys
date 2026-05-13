@@ -270,6 +270,41 @@ export default function AdminCursosPage() {
     }
   };
 
+  // NUEVO: Función para eliminar foto específica
+  const handleEliminarEvidencia = async (urlAEliminar: string) => {
+    if (!alumnoEditando || !confirm("¿Seguro que deseas eliminar esta foto?")) return;
+
+    try {
+      // Quitamos la URL de la lista
+      const nuevasEvidencias = alumnoEditando.evidencias.filter(url => url !== urlAEliminar);
+
+      // Actualizamos la base de datos
+      const { error: updateError } = await supabase
+        .from('estudiantes')
+        .update({ evidencias: nuevasEvidencias })
+        .eq('id', alumnoEditando.id);
+      
+      if (updateError) throw updateError;
+
+      // Opcional: Borrar la imagen física del storage para ahorrar espacio
+      try {
+        const path = urlAEliminar.split('/public/disenos/')[1];
+        if (path) {
+          await supabase.storage.from('disenos').remove([path]);
+        }
+      } catch (storageError) {
+        console.log("No se pudo borrar físicamente del storage, pero sí de la base de datos.", storageError);
+      }
+
+      setAlumnoEditando({ ...alumnoEditando, evidencias: nuevasEvidencias });
+      fetchData();
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+         alert("Error al eliminar imagen: " + error.message);
+      }
+    }
+  };
+
   const getNombreCurso = (id: string) => cursos.find(c => c.id === id)?.nombre || 'Curso Desconocido';
   const getCursoObj = (id: string) => cursos.find(c => c.id === id) || null;
   const getNombreEmpresa = (id: string | null) => id ? empresas.find(e => e.id === id)?.nombre_empresa : 'Particular';
@@ -763,11 +798,20 @@ export default function AdminCursosPage() {
                       <input type="file" accept="image/*" onChange={handleUploadEvidencia} disabled={uploading} className="hidden" />
                     </label>
 
+                    {/* FOTOS DE EVIDENCIA CON BOTON DE ELIMINAR */}
                     {alumnoEditando.evidencias && alumnoEditando.evidencias.length > 0 && (
                       <div className="grid grid-cols-4 gap-2 mt-4">
                         {alumnoEditando.evidencias.map((url, i) => (
-                          <div key={i} className="aspect-square relative rounded-lg overflow-hidden bg-gray-900 border border-gray-800">
+                          <div key={i} className="aspect-square relative rounded-lg overflow-hidden bg-gray-900 border border-gray-800 group">
                             <Image src={url} alt="Evidencia" fill className="object-cover" />
+                            <button
+                              type="button" // IMPORTANTE PARA NO ENVIAR EL FORM
+                              onClick={() => handleEliminarEvidencia(url)}
+                              className="absolute top-1 right-1 bg-red-600 text-white p-1 rounded-md opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-500"
+                              title="Eliminar foto"
+                            >
+                              <XMarkIcon className="h-3 w-3" />
+                            </button>
                           </div>
                         ))}
                       </div>
