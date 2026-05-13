@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase';
 import { AcademicCapIcon } from '@heroicons/react/24/outline';
 
 export default function AcademiaLogin() {
-  const [usuario, setUsuario] = useState(''); // <-- CAMBIADO A USUARIO
+  const [usuario, setUsuario] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const router = useRouter();
@@ -15,17 +15,18 @@ export default function AcademiaLogin() {
     setLoading(true);
 
     try {
+      // Modificado a .limit(1) para soportar alumnos con múltiples cursos
       const { data, error } = await supabase
         .from('estudiantes')
         .select('*')
-        .eq('usuario', usuario) // <-- BUSCAMOS POR EL NUEVO CAMPO
+        .eq('usuario', usuario)
         .eq('password', password)
-        .single();
+        .limit(1);
 
-      if (error || !data) {
+      if (error || !data || data.length === 0) {
         alert('Usuario o contraseña incorrectos.');
       } else {
-        document.cookie = `pache_alumno_id=${encodeURIComponent(data.id)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict`;
+        document.cookie = `pache_alumno_id=${encodeURIComponent(data[0].id)}; path=/; max-age=${60 * 60 * 24 * 7}; SameSite=Strict`;
         router.push('/academia/dashboard');
       }
     } catch (err) {

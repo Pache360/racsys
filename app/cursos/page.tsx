@@ -6,7 +6,8 @@ import {
   ArrowLeftIcon, AcademicCapIcon, PlusIcon, 
   PencilIcon, CheckBadgeIcon, PhotoIcon, XMarkIcon,
   UserGroupIcon, FolderOpenIcon,
-  ListBulletIcon, TrashIcon, LinkIcon, BuildingOfficeIcon
+  ListBulletIcon, TrashIcon, LinkIcon, BuildingOfficeIcon,
+  DocumentPlusIcon
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 
@@ -17,7 +18,7 @@ interface Tema {
 
 interface Modulo {
   modulo: string;
-  temas: (Tema | string)[]; // Soportamos temas antiguos y nuevos
+  temas: (Tema | string)[]; 
 }
 
 interface Curso {
@@ -28,7 +29,6 @@ interface Curso {
   temario: Modulo[];
 }
 
-// NUEVO: Interfaz para Empresas RH
 interface EmpresaRH {
   id: string;
   nombre_empresa: string;
@@ -42,7 +42,7 @@ interface Estudiante {
   usuario: string;
   password?: string;
   curso_id: string;
-  empresa_id: string | null; // NUEVO: Vinculación a empresa
+  empresa_id: string | null; 
   pago_completado: boolean;
   progreso: number;
   evidencias: string[];
@@ -52,13 +52,12 @@ interface Estudiante {
 export default function AdminCursosPage() {
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [estudiantes, setEstudiantes] = useState<Estudiante[]>([]);
-  const [empresas, setEmpresas] = useState<EmpresaRH[]>([]); // Estado de empresas
+  const [empresas, setEmpresas] = useState<EmpresaRH[]>([]); 
   const [loading, setLoading] = useState(true);
   
-  // Agregamos 'Empresas' al menú de vistas
   const [vistaActiva, setVistaActiva] = useState<'Alumnos' | 'Cursos' | 'Empresas'>('Alumnos');
 
-  const [modalVisible, setModalVisible] = useState<'ninguno' | 'curso' | 'alumno' | 'progreso' | 'empresa'>('ninguno');
+  const [modalVisible, setModalVisible] = useState<'ninguno' | 'curso' | 'alumno' | 'progreso' | 'empresa' | 'vincular'>('ninguno');
   const [alumnoEditando, setAlumnoEditando] = useState<Estudiante | null>(null);
   const [cursoEditandoId, setCursoEditandoId] = useState<string | null>(null); 
   const [uploading, setUploading] = useState(false);
@@ -150,7 +149,6 @@ export default function AdminCursosPage() {
   const abrirEdicionCurso = (curso: Curso) => {
     setCursoEditandoId(curso.id);
     
-    // Convertir de forma segura para TypeScript
     const temarioUI = (curso.temario || []).map(m => ({
       modulo: m.modulo,
       temas: m.temas.map((t: Tema | string) => typeof t === 'string' ? { titulo: t, material_url: '' } : t)
@@ -180,6 +178,29 @@ export default function AdminCursosPage() {
       setFormAlumno({ nombre_completo: '', usuario: '', password: '', curso_id: '', empresa_id: '' });
       setVistaActiva('Alumnos'); 
       fetchData();
+    } else alert(error.message);
+  };
+
+  const handleVincularCurso = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!alumnoEditando) return;
+
+    const { error } = await supabase.from('estudiantes').insert([{
+      nombre_completo: alumnoEditando.nombre_completo,
+      usuario: alumnoEditando.usuario,
+      password: alumnoEditando.password,
+      empresa_id: alumnoEditando.empresa_id,
+      curso_id: formAlumno.curso_id,
+      pago_completado: false,
+      progreso: 0,
+      evidencias: [],
+      temas_completados: [] 
+    }]);
+
+    if (!error) {
+      setModalVisible('ninguno');
+      fetchData();
+      alert(`¡${alumnoEditando.nombre_completo} fue inscrito al nuevo curso exitosamente!`);
     } else alert(error.message);
   };
 
@@ -304,6 +325,13 @@ export default function AdminCursosPage() {
             <div key={alumno.id} className="bg-[#111] border border-gray-800 rounded-3xl p-6 shadow-2xl relative overflow-hidden group hover:border-cyan-500/40 transition-all">
               <div className="absolute top-4 right-4 z-10 flex gap-2">
                 <button 
+                  onClick={() => { setAlumnoEditando(alumno); setFormAlumno({...formAlumno, curso_id: ''}); setModalVisible('vincular'); }}
+                  className="bg-black p-2 rounded-xl border border-gray-700 hover:border-green-500 hover:text-green-400 transition-colors shadow-lg"
+                  title="Inscribir a otro curso"
+                >
+                  <DocumentPlusIcon className="h-4 w-4" />
+                </button>
+                <button 
                   onClick={() => { setAlumnoEditando(alumno); setModalVisible('progreso'); }}
                   className="bg-black p-2 rounded-xl border border-gray-700 hover:border-cyan-500 hover:text-cyan-400 transition-colors shadow-lg"
                   title="Gestionar Progreso"
@@ -319,7 +347,7 @@ export default function AdminCursosPage() {
                 </button>
               </div>
 
-              <div className="mb-4 pr-20">
+              <div className="mb-4 pr-24">
                 <h3 className="text-xl font-black uppercase italic truncate">{alumno.nombre_completo}</h3>
                 <p className="text-[10px] font-bold text-gray-500 uppercase tracking-widest">User: {alumno.usuario}</p>
               </div>
@@ -327,11 +355,11 @@ export default function AdminCursosPage() {
               <div className="bg-black border border-gray-800 rounded-xl p-3 mb-4 flex justify-between items-center">
                 <div>
                     <p className="text-[8px] text-cyan-500 font-black uppercase">Empresa</p>
-                    <p className="text-[10px] font-bold">{getNombreEmpresa(alumno.empresa_id)}</p>
+                    <p className="text-[10px] font-bold truncate max-w-25">{getNombreEmpresa(alumno.empresa_id)}</p>
                 </div>
                 <div className="text-right">
                     <p className="text-[8px] text-purple-500 font-black uppercase">Curso</p>
-                    <p className="text-[10px] font-bold">{getNombreCurso(alumno.curso_id)}</p>
+                    <p className="text-[10px] font-bold truncate max-w-25">{getNombreCurso(alumno.curso_id)}</p>
                 </div>
               </div>
 
@@ -459,6 +487,7 @@ export default function AdminCursosPage() {
                 {modalVisible === 'curso' ? (cursoEditandoId ? 'Editar Curso' : 'Crear Nuevo Curso') 
                  : modalVisible === 'alumno' ? 'Registrar Alumno' 
                  : modalVisible === 'empresa' ? 'Nueva Empresa RH' 
+                 : modalVisible === 'vincular' ? 'Inscribir a Curso'
                  : 'Gestionar Avance'}
               </h2>
               <button onClick={() => setModalVisible('ninguno')}><XMarkIcon className="h-6 w-6 text-gray-500" /></button>
@@ -466,6 +495,27 @@ export default function AdminCursosPage() {
 
             <div className="overflow-y-auto p-6 md:p-8">
               
+              {/* MODAL VINCULAR A NUEVO CURSO */}
+              {modalVisible === 'vincular' && alumnoEditando && (
+                <form onSubmit={handleVincularCurso} className="space-y-4">
+                  <div className="bg-green-900/20 border border-green-500/30 p-4 rounded-xl mb-4">
+                    <p className="text-xs text-green-400 font-bold mb-1">Nueva Inscripción</p>
+                    <p className="text-[10px] text-gray-400">Inscribirás a <span className="text-white font-bold">{alumnoEditando.nombre_completo}</span> en un nuevo curso. Su usuario y contraseña seguirán siendo los mismos para que pueda ver todos sus cursos en un solo panel.</p>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest block mb-2">Selecciona el Nuevo Curso</label>
+                    <select required value={formAlumno.curso_id} onChange={e => setFormAlumno({...formAlumno, curso_id: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-green-500 outline-none">
+                      <option value="">Selecciona un curso...</option>
+                      {cursos
+                        .filter(c => !estudiantes.some(e => e.usuario === alumnoEditando.usuario && e.curso_id === c.id))
+                        .map(c => <option key={c.id} value={c.id}>{c.nombre} ({c.fecha_curso})</option>)
+                      }
+                    </select>
+                  </div>
+                  <button className="w-full bg-green-600 hover:bg-green-500 py-4 rounded-xl text-white font-black uppercase text-xs tracking-widest shadow-lg transition-all active:scale-95 mt-4">Inscribir Alumno</button>
+                </form>
+              )}
+
               {/* MODAL EMPRESA */}
               {modalVisible === 'empresa' && (
                 <form onSubmit={handleGuardarEmpresa} className="space-y-4">
@@ -634,7 +684,6 @@ export default function AdminCursosPage() {
                     </select>
                   </div>
                   
-                  {/* Selector de Empresa para B2B */}
                   <div className="pt-2 border-t border-gray-800 mt-2">
                     <label className="text-[10px] font-black text-orange-500 uppercase tracking-widest block mb-2">¿Pertenece a alguna Empresa? (Opcional)</label>
                     <select value={formAlumno.empresa_id} onChange={e => setFormAlumno({...formAlumno, empresa_id: e.target.value})} className="w-full bg-black border border-gray-800 rounded-xl p-4 text-sm text-white focus:border-orange-500 outline-none">
@@ -647,7 +696,7 @@ export default function AdminCursosPage() {
                 </form>
               )}
 
-              {/* MODAL PROGRESO (CHECKBOXES) */}
+              {/* MODAL PROGRESO */}
               {modalVisible === 'progreso' && alumnoEditando && (
                 <form onSubmit={handleActualizarProgreso} className="space-y-6">
                   <div>

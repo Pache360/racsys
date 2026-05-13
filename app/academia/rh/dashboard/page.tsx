@@ -34,7 +34,7 @@ interface Estudiante {
   curso_id: string;
   pago_completado: boolean;
   progreso: number;
-  temas_completados: string[]; // Importante para el detalle
+  temas_completados: string[];
 }
 
 interface Curso {
@@ -53,6 +53,7 @@ type JsPDFInstancia = {
   text: (text: string, x: number, y: number, options?: Record<string, string>) => void;
   setFont: (fontName: string, fontStyle: string) => void;
   save: (filename: string) => void;
+  addImage: (imageData: string | HTMLImageElement, format: string, x: number, y: number, w: number, h: number) => void;
 };
 
 interface CustomWindow extends Window {
@@ -67,10 +68,7 @@ export default function RHDashboard() {
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [loading, setLoading] = useState(true);
   const [generandoPDF, setGenerandoPDF] = useState<string | null>(null);
-  
-  // ESTADO PARA EL MODAL DE DETALLES
   const [empleadoDetalle, setEmpleadoDetalle] = useState<Estudiante | null>(null);
-  
   const router = useRouter();
 
   const handleLogout = useCallback(() => {
@@ -139,28 +137,47 @@ export default function RHDashboard() {
       if (loadedWin.jspdf) {
         const jsPDF = loadedWin.jspdf.jsPDF;
         const doc = new jsPDF({ orientation: 'landscape', unit: 'px', format: [1280, 720] });
-        doc.setFillColor(15, 15, 15);
-        doc.rect(0, 0, 1280, 720, 'F');
-        doc.setTextColor(0, 255, 255); 
-        doc.setFontSize(50);
-        doc.text("CERTIFICADO DE CAPACITACIÓN", 640, 200, { align: 'center' });
+        
+        const cargarImagen = (url: string) => {
+          return new Promise<HTMLImageElement>((resolve, reject) => {
+            const img = new window.Image();
+            img.src = url;
+            img.onload = () => resolve(img);
+            img.onerror = (e) => reject(e);
+          });
+        };
+
+        try {
+          const imgPlantilla = await cargarImagen('/plantilla_constancia.jpg');
+          doc.addImage(imgPlantilla, 'JPEG', 0, 0, 1280, 720);
+        } catch (imgError) {
+          console.error("No se encontro la imagen", imgError);
+          doc.setFillColor(15, 15, 15);
+          doc.rect(0, 0, 1280, 720, 'F');
+        }
+
         doc.setTextColor(255, 255, 255); 
         doc.setFont("helvetica", "bold");
         doc.setFontSize(60);
         doc.text(empleado.nombre_completo.toUpperCase(), 640, 350, { align: 'center' });
-        doc.setTextColor(150, 150, 150); 
-        doc.setFontSize(24);
-        doc.text(`Por haber concluido satisfactoriamente el curso:`, 640, 420, { align: 'center' });
+        
         doc.setTextColor(200, 150, 255); 
         doc.setFontSize(35);
         doc.text(`"${cursoAsignado.nombre}"`, 640, 470, { align: 'center' });
+        
         doc.setTextColor(150, 150, 150);
         doc.setFontSize(20);
         const fechaFormat = new Date(cursoAsignado.fecha_curso).toLocaleDateString('es-MX', { year: 'numeric', month: 'long', day: 'numeric' });
         doc.text(`Impartido en ${cursoAsignado.ubicacion} el ${fechaFormat}`, 640, 520, { align: 'center' });
+        
         doc.save(`Constancia_${empleado.nombre_completo.replace(/\s+/g, '_')}.pdf`);
       }
-    } catch (error) { console.error(error); alert("Error."); } finally { setGenerandoPDF(null); }
+    } catch (error) { 
+      console.error(error); 
+      alert("Error generando constancia."); 
+    } finally { 
+      setGenerandoPDF(null); 
+    }
   };
 
   const getNombreCurso = (id: string) => cursos.find(c => c.id === id)?.nombre || 'Curso Desconocido';
@@ -245,7 +262,6 @@ export default function RHDashboard() {
         })}
       </div>
 
-      {/* ================= MODAL DE DETALLES POR EMPLEADO ================= */}
       {empleadoDetalle && (
         <div className="fixed inset-0 bg-black/95 backdrop-blur-md z-50 flex items-center justify-center p-4">
           <div className="bg-[#0f0f0f] border border-orange-500/20 w-full max-w-2xl rounded-[2.5rem] shadow-2xl flex flex-col max-h-[85vh] overflow-hidden">
